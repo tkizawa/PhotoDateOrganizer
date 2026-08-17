@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="MetadataExtractor" Version="2.8.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Models\LogEntry.cs" Link="Models\LogEntry.cs" />
+    <Compile Include="..\Models\OrganizeProgress.cs" Link="Models\OrganizeProgress.cs" />
+    <Compile Include="..\Models\OrganizeResult.cs" Link="Models\OrganizeResult.cs" />
+    <Compile Include="..\Services\IPhotoOrganizerService.cs" Link="Services\IPhotoOrganizerService.cs" />
+    <Compile Include="..\Services\PhotoOrganizerService.cs" Link="Services\PhotoOrganizerService.cs" />
+  </ItemGroup>
+
+</Project>

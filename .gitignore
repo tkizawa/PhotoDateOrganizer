@@ -1,0 +1,10 @@
+## .NET Core / WinUI
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+.vscode/
+TestResults/
+*.binlog
