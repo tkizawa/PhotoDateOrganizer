@@ -83,6 +83,8 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<LogEntry> Logs { get; } = new();
 
     public event Func<Task<string?>>? RequestFolderPickerAsync;
+    public event Func<Task<string?>>? RequestImportFilePickerAsync;
+    public event Func<Task<string?>>? RequestExportFilePickerAsync;
 
     public MainViewModel(IPhotoOrganizerService organizerService)
     {
@@ -244,25 +246,61 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void OpenSettingsFolder()
+    private async Task ImportSettingsAsync()
     {
-        var settingsDir = SettingsService.GetSettingsDirectory();
-        if (!Directory.Exists(settingsDir))
-        {
-            Directory.CreateDirectory(settingsDir);
-        }
+        if (RequestImportFilePickerAsync == null) return;
 
         try
         {
-            Process.Start(new ProcessStartInfo
+            var filePath = await RequestImportFilePickerAsync();
+            if (string.IsNullOrEmpty(filePath)) return;
+
+            var settingsService = new SettingsService();
+            var settings = settingsService.ImportSettings(filePath);
+
+            if (!string.IsNullOrEmpty(settings.SourceDirectory))
             {
-                FileName = settingsDir,
-                UseShellExecute = true
-            });
+                SourceDirectory = settings.SourceDirectory;
+            }
+            if (!string.IsNullOrEmpty(settings.DestinationDirectory))
+            {
+                DestinationDirectory = settings.DestinationDirectory;
+            }
+
+            AddLog(LogLevel.Info, $"設定をインポートしました: {filePath}");
+            StatusMessage = $"設定をインポートしました ({Path.GetFileName(filePath)})";
         }
         catch (Exception ex)
         {
-            AddLog(LogLevel.Error, $"設定フォルダを開けませんでした: {ex.Message}");
+            AddLog(LogLevel.Error, $"設定のインポートに失敗しました: {ex.Message}");
+            StatusMessage = $"設定インポートエラー: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExportSettingsAsync()
+    {
+        if (RequestExportFilePickerAsync == null) return;
+
+        try
+        {
+            var filePath = await RequestExportFilePickerAsync();
+            if (string.IsNullOrEmpty(filePath)) return;
+
+            var settingsService = new SettingsService();
+            var currentSettings = settingsService.LoadSettings();
+            currentSettings.SourceDirectory = SourceDirectory ?? string.Empty;
+            currentSettings.DestinationDirectory = DestinationDirectory ?? string.Empty;
+
+            settingsService.ExportSettings(filePath, currentSettings);
+
+            AddLog(LogLevel.Info, $"設定をエクスポートしました: {filePath}");
+            StatusMessage = $"設定をエクスポートしました ({Path.GetFileName(filePath)})";
+        }
+        catch (Exception ex)
+        {
+            AddLog(LogLevel.Error, $"設定のエクスポートに失敗しました: {ex.Message}");
+            StatusMessage = $"設定エクスポートエラー: {ex.Message}";
         }
     }
 

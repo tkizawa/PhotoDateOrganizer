@@ -14,13 +14,14 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageReference Include="MetadataExtractor" Version="2.8.1" />
   </ItemGroup>
-
   <ItemGroup>
+    <Compile Include="..\Models\AppSettings.cs" Link="Models\AppSettings.cs" />
     <Compile Include="..\Models\LogEntry.cs" Link="Models\LogEntry.cs" />
     <Compile Include="..\Models\OrganizeProgress.cs" Link="Models\OrganizeProgress.cs" />
     <Compile Include="..\Models\OrganizeResult.cs" Link="Models\OrganizeResult.cs" />
     <Compile Include="..\Services\IPhotoOrganizerService.cs" Link="Services\IPhotoOrganizerService.cs" />
     <Compile Include="..\Services\PhotoOrganizerService.cs" Link="Services\PhotoOrganizerService.cs" />
+    <Compile Include="..\Services\SettingsService.cs" Link="Services\SettingsService.cs" />
   </ItemGroup>
 
 </Project>

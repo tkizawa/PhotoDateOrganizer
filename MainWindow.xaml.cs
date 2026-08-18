@@ -35,6 +35,8 @@ public sealed partial class MainWindow : Window
         // Initialize ViewModel
         ViewModel = new MainViewModel();
         ViewModel.RequestFolderPickerAsync += PickFolderAsync;
+        ViewModel.RequestImportFilePickerAsync += PickImportFileAsync;
+        ViewModel.RequestExportFilePickerAsync += PickExportFileAsync;
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         // Set window title with version
@@ -148,5 +150,32 @@ public sealed partial class MainWindow : Window
 
         var folder = await folderPicker.PickSingleFolderAsync();
         return folder?.Path;
+    }
+
+    private async Task<string?> PickImportFileAsync()
+    {
+        var openPicker = new FileOpenPicker();
+        var hwnd = WindowNative.GetWindowHandle(this);
+        InitializeWithWindow.Initialize(openPicker, hwnd);
+
+        openPicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+        openPicker.FileTypeFilter.Add(".json");
+
+        var file = await openPicker.PickSingleFileAsync();
+        return file?.Path;
+    }
+
+    private async Task<string?> PickExportFileAsync()
+    {
+        var savePicker = new FileSavePicker();
+        var hwnd = WindowNative.GetWindowHandle(this);
+        InitializeWithWindow.Initialize(savePicker, hwnd);
+
+        savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+        savePicker.FileTypeChoices.Add("JSON ファイル (*.json)", new[] { ".json" });
+        savePicker.SuggestedFileName = "PhotoDateOrganizer_settings.json";
+
+        var file = await savePicker.PickSaveFileAsync();
+        return file?.Path;
     }
 }

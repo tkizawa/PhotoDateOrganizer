@@ -34,17 +34,26 @@
                             <TextBlock Text="{x:Bind ViewModel.AppVersionDisplay, Mode=OneWay}" FontSize="11" FontWeight="Medium" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
                         </Border>
                     </StackPanel>
-                    <TextBlock Text="iPhoneやデジカメのExif/動画メタデータを厳密解析し、撮影日ごとの階層フォルダ（YYYY\YYYY-MM\YYYY-MM-DD）へ自動整理します。" 
+                    <TextBlock Text="iPhoneやデジカメのExif/動画メタデータを解析し、撮影日ごとの階層フォルダ（YYYY\YYYY-MM\YYYY-MM-DD）へ自動整理します。" 
                                FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="48,0,0,0"/>
                 </StackPanel>
 
                 <!-- Actions Right -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Button Command="{x:Bind ViewModel.OpenSettingsFolderCommand}"
-                            ToolTipService.ToolTip="設定フォルダ (AppData\Local\PhotoDateOrganizer) を開く">
+                    <Button Command="{x:Bind ViewModel.ImportSettingsCommand}"
+                            IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
+                            ToolTipService.ToolTip="設定ファイル (JSON) をインポート">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE713;" FontSize="14" />
-                            <TextBlock Text="設定を開く" />
+                            <FontIcon Glyph="&#xE8B5;" FontSize="14" />
+                            <TextBlock Text="設定インポート" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{x:Bind ViewModel.ExportSettingsCommand}"
+                            IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
+                            ToolTipService.ToolTip="現在の設定をJSONファイルへエクスポート">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xEDE1;" FontSize="14" />
+                            <TextBlock Text="設定エクスポート" />
                         </StackPanel>
                     </Button>
                     <Button Command="{x:Bind ViewModel.OpenDestinationFolderCommand}"
