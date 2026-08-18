@@ -26,8 +26,8 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Vertical" Spacing="4">
                     <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                        <Border Width="36" Height="36" CornerRadius="8" Background="{ThemeResource AccentFillColorDefaultBrush}">
-                            <FontIcon Glyph="&#xEB9F;" Foreground="White" FontSize="18" />
+                        <Border Width="36" Height="36" CornerRadius="8" Background="Transparent">
+                            <Image Source="ms-appx:///Assets/app_icon.png" Width="36" Height="36" Stretch="UniformToFill" />
                         </Border>
                         <TextBlock Text="PhotoDateOrganizer" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
                         <Border Background="{ThemeResource AccentFillColorTertiaryBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">

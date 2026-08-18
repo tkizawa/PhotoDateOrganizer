@@ -42,6 +42,20 @@ public sealed partial class MainWindow : Window
         // Set window title with version
         this.Title = $"PhotoDateOrganizer {ViewModel.AppVersionDisplay} - 写真・動画撮影日時自動整理";
 
+        // Set window icon
+        try
+        {
+            var iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "app_icon.ico");
+            if (System.IO.File.Exists(iconPath))
+            {
+                this.AppWindow.SetIcon(iconPath);
+            }
+        }
+        catch
+        {
+            // Ignore icon setting errors
+        }
+
         // Restore settings (Window position, size, and folders)
         RestoreSettings();
 
