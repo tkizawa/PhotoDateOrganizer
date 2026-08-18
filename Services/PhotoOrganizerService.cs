@@ -28,6 +28,23 @@ public class PhotoOrganizerService : IPhotoOrganizerService
         ".mp4"
     };
 
+    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mov",
+        ".mp4"
+    };
+
+    public static bool IsVideoFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
+        var ext = Path.GetExtension(filePath);
+        return VideoExtensions.Contains(ext);
+    }
+
     private static readonly string[] ExifDateTimeFormats = new[]
     {
         "yyyy:MM:dd HH:mm:ss",
@@ -146,12 +163,17 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                         fallbackCount++;
                     }
 
-                    // 2. Build Destination Path: [Dest] \ YYYY \ YYYY-MM \ YYYY-MM-DD \ [FileName]
+                    // 2. Build Destination Path: [Dest] \ YYYY \ YYYY-MM \ YYYY-MM-DD (\ 動画) \ [FileName]
                     string year = captureDate.ToString("yyyy", CultureInfo.InvariantCulture);
                     string yearMonth = captureDate.ToString("yyyy-MM", CultureInfo.InvariantCulture);
                     string yearMonthDay = captureDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
                     string targetFolder = Path.Combine(destinationDirectory, year, yearMonth, yearMonthDay);
+                    if (IsVideoFile(sourceFile))
+                    {
+                        targetFolder = Path.Combine(targetFolder, "動画");
+                    }
+
                     if (!System.IO.Directory.Exists(targetFolder))
                     {
                         System.IO.Directory.CreateDirectory(targetFolder);

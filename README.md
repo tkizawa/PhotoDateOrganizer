@@ -15,10 +15,12 @@ Windows デスクトップ向けのモダンな写真・動画自動整理ツー
      2. QuickTime / MP4: `QuickTimeMovieHeaderDirectory.TagCreated` -> `QuickTimeTrackHeaderDirectory.TagCreated`
      3. フォールバック: メタデータが存在しない/破損している場合は `File.GetCreationTime()` を利用し、ログに警告を表示。
 
-2. **3階層フォルダ自動生成**
+2. **日付別階層フォルダ自動生成（写真・動画の自動分類）**
    - 撮影日（例: `2026-05-10 14:30:00`）に基づき、以下の階層を作成してコピーします。
-   - `[出力先ルート] \ YYYY \ YYYY-MM \ YYYY-MM-DD \ [ファイル名]`
-   - *(例: `D:\Photos\2026\2026-05\2026-05-10\IMG_1234.HEIC`)*
+   - **写真ファイル:** `[出力先ルート] \ YYYY \ YYYY-MM \ YYYY-MM-DD \ [ファイル名]`
+     *(例: `D:\Photos\2026\2026-05\2026-05-10\IMG_1234.HEIC`)*
+   - **動画ファイル:** `[出力先ルート] \ YYYY \ YYYY-MM \ YYYY-MM-DD \ 動画 \ [ファイル名]`
+     *(例: `D:\Photos\2026\2026-05\2026-05-10\動画\MOV_1234.MP4`)*
 
 3. **安全な重複・衝突回避**
    - 同名ファイルが存在する場合、ファイルサイズと MD5 ハッシュ値を比較。

@@ -77,6 +77,43 @@ public class PhotoOrganizerServiceTests : IDisposable
         Assert.True(File.Exists(expectedPath), $"Expected file at {expectedPath}");
     }
 
+    [Fact]
+    public async Task OrganizeAsync_VideoFiles_SavesToVideosSubdirectory()
+    {
+        var photoFile = Path.Combine(_sourceDir, "IMG_20230308_143000.jpg");
+        var videoFileMp4 = Path.Combine(_sourceDir, "VID_20230308_150000.mp4");
+        var videoFileMov = Path.Combine(_sourceDir, "MOV_20230308_160000.mov");
+
+        await File.WriteAllBytesAsync(photoFile, new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 });
+        await File.WriteAllBytesAsync(videoFileMp4, new byte[] { 0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70 });
+        await File.WriteAllBytesAsync(videoFileMov, new byte[] { 0x00, 0x00, 0x00, 0x14, 0x66, 0x74, 0x79, 0x70 });
+
+        var progress = new Progress<OrganizeProgress>(_ => { });
+        var result = await _service.OrganizeAsync(_sourceDir, _destDir, progress, CancellationToken.None);
+
+        Assert.Equal(3, result.TotalScanned);
+        Assert.Equal(3, result.CopiedCount);
+
+        var expectedPhotoPath = Path.Combine(_destDir, "2023", "2023-03", "2023-03-08", "IMG_20230308_143000.jpg");
+        var expectedMp4Path = Path.Combine(_destDir, "2023", "2023-03", "2023-03-08", "動画", "VID_20230308_150000.mp4");
+        var expectedMovPath = Path.Combine(_destDir, "2023", "2023-03", "2023-03-08", "動画", "MOV_20230308_160000.mov");
+
+        Assert.True(File.Exists(expectedPhotoPath), $"Expected photo at {expectedPhotoPath}");
+        Assert.True(File.Exists(expectedMp4Path), $"Expected video at {expectedMp4Path}");
+        Assert.True(File.Exists(expectedMovPath), $"Expected video at {expectedMovPath}");
+    }
+
+    [Theory]
+    [InlineData("video.mp4", true)]
+    [InlineData("video.MOV", true)]
+    [InlineData("photo.jpg", false)]
+    [InlineData("photo.PNG", false)]
+    [InlineData("photo.heic", false)]
+    public void IsVideoFile_ChecksExtensionsCorrectly(string fileName, bool expectedIsVideo)
+    {
+        Assert.Equal(expectedIsVideo, PhotoOrganizerService.IsVideoFile(fileName));
+    }
+
     [Theory]
     [InlineData("IMG_20230308_123456", 2023, 3, 8)]
     [InlineData("2023-03-08_Photo", 2023, 3, 8)]
