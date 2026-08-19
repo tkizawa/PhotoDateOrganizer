@@ -78,7 +78,7 @@ public sealed partial class MainWindow : Window
             this.AppWindow.Move(new PointInt32(settings.WindowX, settings.WindowY));
         }
 
-        // Restore Folders
+        // Restore Folders & Options
         if (!string.IsNullOrEmpty(settings.SourceDirectory))
         {
             ViewModel.SourceDirectory = settings.SourceDirectory;
@@ -88,6 +88,8 @@ public sealed partial class MainWindow : Window
         {
             ViewModel.DestinationDirectory = settings.DestinationDirectory;
         }
+
+        ViewModel.SkipCloudOnlyFiles = settings.SkipCloudOnlyFiles;
     }
 
     private void SaveCurrentSettings()
@@ -104,7 +106,8 @@ public sealed partial class MainWindow : Window
                 WindowWidth = size.Width,
                 WindowHeight = size.Height,
                 SourceDirectory = ViewModel.SourceDirectory ?? string.Empty,
-                DestinationDirectory = ViewModel.DestinationDirectory ?? string.Empty
+                DestinationDirectory = ViewModel.DestinationDirectory ?? string.Empty,
+                SkipCloudOnlyFiles = ViewModel.SkipCloudOnlyFiles
             };
 
             _settingsService.SaveSettings(settings);
@@ -117,7 +120,9 @@ public sealed partial class MainWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(ViewModel.SourceDirectory) or nameof(ViewModel.DestinationDirectory))
+        if (e.PropertyName is nameof(ViewModel.SourceDirectory) 
+            or nameof(ViewModel.DestinationDirectory) 
+            or nameof(ViewModel.SkipCloudOnlyFiles))
         {
             SaveCurrentSettings();
         }

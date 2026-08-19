@@ -133,6 +133,12 @@
                                 </Grid>
                             </StackPanel>
 
+                            <!-- Cloud Files Option -->
+                            <CheckBox IsChecked="{x:Bind ViewModel.SkipCloudOnlyFiles, Mode=TwoWay}"
+                                      IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
+                                      Content="OneDrive / SharePoint などのオンライン専用ファイル（未ダウンロード）をスキップする（推奨）"
+                                      ToolTipService.ToolTip="ローカルディスクに実体がないクラウド専用ファイルを整理対象外として安全にスキップします。チェックを外すとダウンロードを試みますが、エラーになる場合があります。" />
+
                             <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
                                      Message="対象形式: .jpg, .jpeg, .heic, .png, .mov, .mp4（同名ファイルはハッシュ比較で自動判別・連番付与）" />
                         </StackPanel>

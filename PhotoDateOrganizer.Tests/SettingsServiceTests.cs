@@ -44,7 +44,8 @@ public class SettingsServiceTests : IDisposable
             WindowX = 150,
             WindowY = 200,
             WindowWidth = 1280,
-            WindowHeight = 800
+            WindowHeight = 800,
+            SkipCloudOnlyFiles = true
         };
 
         // Act
@@ -59,6 +60,7 @@ public class SettingsServiceTests : IDisposable
         Assert.Equal(originalSettings.WindowY, importedSettings.WindowY);
         Assert.Equal(originalSettings.WindowWidth, importedSettings.WindowWidth);
         Assert.Equal(originalSettings.WindowHeight, importedSettings.WindowHeight);
+        Assert.Equal(originalSettings.SkipCloudOnlyFiles, importedSettings.SkipCloudOnlyFiles);
     }
 
     [Fact]

@@ -33,6 +33,9 @@ public partial class MainViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(CancelOrganizingCommand))]
     private bool _isProcessing;
 
+    [ObservableProperty]
+    private bool _skipCloudOnlyFiles = true;
+
     public bool IsIdle => !IsProcessing;
 
     [ObservableProperty]
@@ -166,7 +169,8 @@ public partial class MainViewModel : ObservableObject
                 SourceDirectory,
                 DestinationDirectory,
                 progressHandler,
-                _cancellationTokenSource.Token);
+                _cancellationTokenSource.Token,
+                SkipCloudOnlyFiles);
 
             if (result.IsCancelled)
             {
@@ -266,6 +270,7 @@ public partial class MainViewModel : ObservableObject
             {
                 DestinationDirectory = settings.DestinationDirectory;
             }
+            SkipCloudOnlyFiles = settings.SkipCloudOnlyFiles;
 
             AddLog(LogLevel.Info, $"設定をインポートしました: {filePath}");
             StatusMessage = $"設定をインポートしました ({Path.GetFileName(filePath)})";
@@ -291,6 +296,7 @@ public partial class MainViewModel : ObservableObject
             var currentSettings = settingsService.LoadSettings();
             currentSettings.SourceDirectory = SourceDirectory ?? string.Empty;
             currentSettings.DestinationDirectory = DestinationDirectory ?? string.Empty;
+            currentSettings.SkipCloudOnlyFiles = SkipCloudOnlyFiles;
 
             settingsService.ExportSettings(filePath, currentSettings);
 

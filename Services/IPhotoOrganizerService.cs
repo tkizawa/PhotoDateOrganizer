@@ -11,5 +11,6 @@ public interface IPhotoOrganizerService
         string sourceDirectory,
         string destinationDirectory,
         IProgress<OrganizeProgress> progress,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        bool skipCloudOnlyFiles = true);
 }

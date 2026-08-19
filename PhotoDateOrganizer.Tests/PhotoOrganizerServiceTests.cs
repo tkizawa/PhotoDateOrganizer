@@ -203,4 +203,66 @@ public class PhotoOrganizerServiceTests : IDisposable
         Assert.True(result.IsCancelled);
         Assert.True(result.CopiedCount < 20);
     }
+
+    [Fact]
+    public void IsCloudOnlyFile_NonExistentOrLocalFile_ReturnsFalse()
+    {
+        Assert.False(PhotoOrganizerService.IsCloudOnlyFile(""));
+        Assert.False(PhotoOrganizerService.IsCloudOnlyFile(Path.Combine(_sourceDir, "non_existent.jpg")));
+
+        var localFile = Path.Combine(_sourceDir, "local_photo.jpg");
+        File.WriteAllBytes(localFile, new byte[] { 1, 2, 3 });
+
+        Assert.False(PhotoOrganizerService.IsCloudOnlyFile(localFile));
+    }
+
+    [Fact]
+    public void IsCloudOnlyFile_OfflineAttribute_ReturnsTrue()
+    {
+        var cloudFile = Path.Combine(_sourceDir, "cloud_photo.jpg");
+        File.WriteAllBytes(cloudFile, new byte[] { 1, 2, 3 });
+
+        // Set Offline file attribute
+        File.SetAttributes(cloudFile, File.GetAttributes(cloudFile) | FileAttributes.Offline);
+
+        Assert.True(PhotoOrganizerService.IsCloudOnlyFile(cloudFile));
+    }
+
+    [Fact]
+    public void IsCloudFileException_DetectsKnownHResultAndMessages()
+    {
+        var cantAccessEx = new IOException("File error", unchecked((int)0x80070780));
+        var cloudUnsuccessfulEx = new IOException("Cloud error", unchecked((int)0x800701AA));
+        var genericMessageEx = new Exception("クラウド ファイル プロバイダーが実行されていません。");
+        var regularEx = new FileNotFoundException("File not found");
+
+        Assert.True(PhotoOrganizerService.IsCloudFileException(cantAccessEx));
+        Assert.True(PhotoOrganizerService.IsCloudFileException(cloudUnsuccessfulEx));
+        Assert.True(PhotoOrganizerService.IsCloudFileException(genericMessageEx));
+        Assert.False(PhotoOrganizerService.IsCloudFileException(regularEx));
+    }
+
+    [Fact]
+    public async Task OrganizeAsync_SkipCloudOnlyFiles_SkipsOfflineFiles()
+    {
+        var localFile = Path.Combine(_sourceDir, "IMG_20230308_100000.jpg");
+        var cloudFile = Path.Combine(_sourceDir, "IMG_20230308_200000.jpg");
+
+        await File.WriteAllBytesAsync(localFile, new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 });
+        await File.WriteAllBytesAsync(cloudFile, new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 });
+
+        File.SetAttributes(cloudFile, File.GetAttributes(cloudFile) | FileAttributes.Offline);
+
+        var progress = new Progress<OrganizeProgress>(_ => { });
+        var result = await _service.OrganizeAsync(_sourceDir, _destDir, progress, CancellationToken.None, skipCloudOnlyFiles: true);
+
+        Assert.Equal(2, result.TotalScanned);
+        Assert.Equal(1, result.CopiedCount);
+        Assert.Equal(1, result.SkippedCount);
+        Assert.Equal(0, result.ErrorCount);
+
+        var destFiles = Directory.GetFiles(_destDir, "*.*", SearchOption.AllDirectories);
+        Assert.Single(destFiles);
+        Assert.Equal("IMG_20230308_100000.jpg", Path.GetFileName(destFiles[0]));
+    }
 }

@@ -70,11 +70,74 @@ public class PhotoOrganizerService : IPhotoOrganizerService
         @"(?:^|[\D])(?<ts>(?:1[5-9]|20)\d{8}(?:\d{3})?)(?:[\D]|$)",
         RegexOptions.Compiled);
 
+    // Windows クラウドファイル属性（OneDrive / SharePoint プレースホルダー）
+    private const FileAttributes AttributeRecallOnOpen = (FileAttributes)0x00040000;
+    private const FileAttributes AttributeRecallOnDataAccess = (FileAttributes)0x00400000;
+
+    /// <summary>
+    /// 指定されたファイルが OneDrive や SharePoint などのオンライン専用（ローカルに未ダウンロード）ファイルかどうかを判定します。
+    /// </summary>
+    public static bool IsCloudOnlyFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            if (!File.Exists(filePath))
+            {
+                return false;
+            }
+
+            var attributes = File.GetAttributes(filePath);
+
+            // Offline または RecallOnDataAccess または RecallOnOpen 属性がある場合はローカルに実体がない
+            return (attributes & FileAttributes.Offline) != 0 ||
+                   (attributes & AttributeRecallOnOpen) != 0 ||
+                   (attributes & AttributeRecallOnDataAccess) != 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 例外がクラウドファイル（OneDrive / SharePoint等）のダウンロード失敗や未同期に起因するものか判定します。
+    /// </summary>
+    public static bool IsCloudFileException(Exception ex)
+    {
+        // 0x80070780: ERROR_CANT_ACCESS_FILE (ファイルにアクセスできません)
+        // 0x800701AA: ERROR_CLOUD_FILE_UNSUCCESSFUL (クラウド操作が失敗しました)
+        // 0x80070178 - 0x80070188: クラウドファイル関連エラーコード群
+        int hResult = ex.HResult;
+        if (hResult == unchecked((int)0x80070780) ||
+            hResult == unchecked((int)0x800701AA) ||
+            (hResult >= unchecked((int)0x80070178) && hResult <= unchecked((int)0x80070188)))
+        {
+            return true;
+        }
+
+        var message = ex.Message;
+        if (message.Contains("0x80070780", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("0x800701AA", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("クラウド", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("cloud", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     public async Task<OrganizeResult> OrganizeAsync(
         string sourceDirectory,
         string destinationDirectory,
         IProgress<OrganizeProgress> progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool skipCloudOnlyFiles = true)
     {
         var stopwatch = Stopwatch.StartNew();
         int copiedCount = 0;
@@ -151,6 +214,31 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 var sourceFile = files[i];
                 var fileName = Path.GetFileName(sourceFile);
                 int currentIndex = i + 1;
+
+                // 0. クラウド専用ファイル（未ダウンロード）の事前チェック
+                if (skipCloudOnlyFiles && IsCloudOnlyFile(sourceFile))
+                {
+                    skippedCount++;
+                    progress.Report(new OrganizeProgress
+                    {
+                        Phase = OrganizePhase.Organizing,
+                        ProcessedCount = currentIndex,
+                        TotalCount = totalFiles,
+                        CopiedCount = copiedCount,
+                        SkippedCount = skippedCount,
+                        ErrorCount = errorCount,
+                        FallbackCount = fallbackCount,
+                        CurrentFilePath = sourceFile,
+                        StatusMessage = $"スキップ: {fileName}（OneDrive/クラウド専用ファイル）",
+                        NewLogEntry = new LogEntry
+                        {
+                            Level = LogLevel.Warning,
+                            Message = $"[スキップ] クラウド専用ファイルのためスキップしました（ローカルに未ダウンロード）: {fileName}",
+                            FilePath = sourceFile
+                        }
+                    });
+                    continue;
+                }
 
                 try
                 {
@@ -246,6 +334,10 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 catch (Exception ex)
                 {
                     errorCount++;
+                    string errorMsg = IsCloudFileException(ex)
+                        ? $"[エラー] {fileName}: OneDrive/クラウド専用ファイルへのアクセスに失敗しました。ローカルにダウンロードされていないか、同期が停止している可能性があります。"
+                        : $"[エラー] {fileName}: {ex.Message}";
+
                     progress.Report(new OrganizeProgress
                     {
                         Phase = OrganizePhase.Organizing,
@@ -260,7 +352,7 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                         NewLogEntry = new LogEntry
                         {
                             Level = LogLevel.Error,
-                            Message = $"[エラー] {fileName}: {ex.Message}",
+                            Message = errorMsg,
                             FilePath = sourceFile
                         }
                     });

@@ -8,4 +8,9 @@ public class AppSettings
     public int WindowY { get; set; } = -1;
     public int WindowWidth { get; set; } = 1100;
     public int WindowHeight { get; set; } = 750;
+
+    /// <summary>
+    /// OneDriveやSharePointなどのオンライン専用（未ダウンロード）ファイルをスキップするかどうか
+    /// </summary>
+    public bool SkipCloudOnlyFiles { get; set; } = true;
 }
