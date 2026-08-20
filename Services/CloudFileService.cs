@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -43,33 +44,45 @@ public class CloudFileService : ICloudFileService
     private const uint CF_HYDRATE_FLAG_NONE = 0x00000000;
     private const uint CF_DEHYDRATE_FLAG_NONE = 0x00000000;
 
-    // Win32 CreateFile 定数
-    private const uint GENERIC_READ = 0x80000000;
-    private const uint GENERIC_WRITE = 0x40000000;
-    private const uint FILE_READ_DATA = 0x0001;
-    private const uint FILE_WRITE_DATA = 0x0002;
-    private const uint FILE_READ_ATTRIBUTES = 0x0080;
-    private const uint FILE_WRITE_ATTRIBUTES = 0x0100;
-    private const uint FILE_SHARE_READ = 0x00000001;
-    private const uint FILE_SHARE_WRITE = 0x00000002;
-    private const uint FILE_SHARE_DELETE = 0x00000004;
-    private const uint OPEN_EXISTING = 3;
-    private const uint FILE_FLAG_BACKUP_SEMANTICS = 0x02000000;
-    private const uint FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000;
+    [Flags]
+    private enum CF_OPEN_FILE_FLAGS : uint
+    {
+        CF_OPEN_FILE_FLAG_NONE = 0x00000000,
+        CF_OPEN_FILE_FLAG_EXCLUSIVE = 0x00000001,
+        CF_OPEN_FILE_FLAG_WRITE_ACCESS = 0x00000002,
+        CF_OPEN_FILE_FLAG_DELETE_ACCESS = 0x00000004,
+        CF_OPEN_FILE_FLAG_FOREGROUND = 0x00000008,
+    }
+
+    private enum CF_PIN_STATE : int
+    {
+        CF_PIN_STATE_UNSPECIFIED = 0,
+        CF_PIN_STATE_PINNED = 1,
+        CF_PIN_STATE_UNPINNED = 2,
+        CF_PIN_STATE_EXCLUDED = 3,
+        CF_PIN_STATE_INHERIT = 4,
+    }
+
+    private enum CF_SET_PIN_FLAGS : int
+    {
+        CF_SET_PIN_FLAG_NONE = 0x00000000,
+        CF_SET_PIN_FLAG_RECURSE = 0x00000001,
+        CF_SET_PIN_FLAG_RECURSE_ONLY = 0x00000002,
+        CF_SET_PIN_FLAG_RECURSE_STOP_ON_ERROR = 0x00000004,
+    }
 
     // クラウドファイル属性
     private const FileAttributes AttributeRecallOnOpen = (FileAttributes)0x00040000;
     private const FileAttributes AttributeRecallOnDataAccess = (FileAttributes)0x00400000;
 
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    private static extern SafeFileHandle CreateFileW(
-        string lpFileName,
-        uint dwDesiredAccess,
-        uint dwShareMode,
-        IntPtr lpSecurityAttributes,
-        uint dwCreationDisposition,
-        uint dwFlagsAndAttributes,
-        IntPtr hTemplateFile);
+    [DllImport("cldapi.dll", ExactSpelling = true, SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern int CfOpenFileWithOplock(
+        string filePath,
+        CF_OPEN_FILE_FLAGS flags,
+        out IntPtr protectedHandle);
+
+    [DllImport("cldapi.dll", ExactSpelling = true, SetLastError = true)]
+    private static extern void CfCloseHandle(IntPtr protectedHandle);
 
     [DllImport("cldapi.dll", ExactSpelling = true, SetLastError = true)]
     private static extern int CfHydratePlaceholder(
@@ -81,10 +94,17 @@ public class CloudFileService : ICloudFileService
 
     [DllImport("cldapi.dll", ExactSpelling = true, SetLastError = true)]
     private static extern int CfDehydratePlaceholder(
-        SafeFileHandle fileHandle,
+        IntPtr fileHandle,
         long startingOffset,
         long length,
         uint dehydrateFlags,
+        IntPtr overlapped);
+
+    [DllImport("cldapi.dll", ExactSpelling = true, SetLastError = true)]
+    private static extern int CfSetPinState(
+        IntPtr fileHandle,
+        CF_PIN_STATE pinState,
+        CF_SET_PIN_FLAGS pinFlags,
         IntPtr overlapped);
 
     /// <summary>
@@ -205,59 +225,138 @@ public class CloudFileService : ICloudFileService
         {
             try
             {
-                // CfDehydratePlaceholder に必要な権限でハンドルを取得
-                // 注: ダウンロード済みファイルはリパースポイントではないため FILE_FLAG_OPEN_REPARSE_POINT は指定しない
-                using var handle = CreateFileW(
-                    filePath,
-                    FILE_WRITE_DATA | FILE_READ_DATA | FILE_WRITE_ATTRIBUTES | FILE_READ_ATTRIBUTES,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                    IntPtr.Zero,
-                    OPEN_EXISTING,
-                    FILE_FLAG_BACKUP_SEMANTICS,
-                    IntPtr.Zero);
-
-                if (handle.IsInvalid)
+                // Cloud Filter API (cldapi.dll) を使用して Oplock 付きハンドルを開く
+                // ※通常の CreateFileW を使用すると、ドライバや OneDrive 同期エンジンとデッドロック・ブロックしてハングする原因となります
+                int openHr = CfOpenFileWithOplock(filePath, CF_OPEN_FILE_FLAGS.CF_OPEN_FILE_FLAG_EXCLUSIVE, out IntPtr handle);
+                if (openHr != 0 || handle == IntPtr.Zero || handle == (IntPtr)(-1))
                 {
-                    int error = Marshal.GetLastWin32Error();
-                    if (attempt < 3)
-                    {
-                        Thread.Sleep(150);
-                        continue;
-                    }
-                    errorMessage = $"ファイルハンドルの取得に失敗しました (Win32Error: {error})";
-                    return false;
+                    // 排他オープンに失敗した場合は通常オープンフラグで再試行
+                    openHr = CfOpenFileWithOplock(filePath, CF_OPEN_FILE_FLAGS.CF_OPEN_FILE_FLAG_NONE, out handle);
                 }
 
-                // CfDehydratePlaceholder を呼び出し、ファイル全体 (StartingOffset=0, Length=-1) を解放
-                int hr = CfDehydratePlaceholder(handle, 0, -1, CF_DEHYDRATE_FLAG_NONE, IntPtr.Zero);
-                if (hr != 0) // S_OK 以外
+                if (openHr == 0 && handle != IntPtr.Zero && handle != (IntPtr)(-1))
+                {
+                    try
+                    {
+                        // 1. ピン留め解除（空き容量解放の意思表示）を設定
+                        try
+                        {
+                            CfSetPinState(handle, CF_PIN_STATE.CF_PIN_STATE_UNPINNED, CF_SET_PIN_FLAGS.CF_SET_PIN_FLAG_NONE, IntPtr.Zero);
+                        }
+                        catch
+                        {
+                            // PinState 設定失敗は致命的でないため継続
+                        }
+
+                        // 2. CfDehydratePlaceholder を呼び出し、ファイル全体 (StartingOffset=0, Length=-1) を解放
+                        int dehydrateHr = CfDehydratePlaceholder(handle, 0, -1, CF_DEHYDRATE_FLAG_NONE, IntPtr.Zero);
+                        if (dehydrateHr == 0) // S_OK
+                        {
+                            return true;
+                        }
+
+                        if (attempt < 3)
+                        {
+                            Thread.Sleep(100);
+                            continue;
+                        }
+
+                        errorMessage = $"CfDehydratePlaceholder が失敗しました (HRESULT: 0x{dehydrateHr:X8})";
+                    }
+                    finally
+                    {
+                        // CfOpenFileWithOplock で取得したハンドルは必ず CfCloseHandle で解放する
+                        CfCloseHandle(handle);
+                    }
+                }
+                else
                 {
                     if (attempt < 3)
                     {
-                        Thread.Sleep(150);
+                        Thread.Sleep(100);
                         continue;
                     }
-                    errorMessage = $"CfDehydratePlaceholder が失敗しました (HRESULT: 0x{hr:X8})";
-                    return false;
+                    errorMessage = $"CfOpenFileWithOplock に失敗しました (HRESULT: 0x{openHr:X8})";
                 }
-
-                return true;
             }
             catch (DllNotFoundException)
             {
-                errorMessage = "cldapi.dll が見つかりません。このバージョンの Windows では Dehydrate をサポートしていません。";
-                return false;
+                // cldapi.dll が見つからない場合は Windows 標準の attrib コマンドフォールバックへ進む
+                break;
             }
             catch (Exception ex)
             {
                 if (attempt < 3)
                 {
-                    Thread.Sleep(150);
+                    Thread.Sleep(100);
                     continue;
                 }
                 errorMessage = $"Dehydrate 実行中に例外が発生しました: {ex.Message}";
-                return false;
             }
+        }
+
+        // Cloud Filter API が失敗、またはサポート外環境の場合、Windows 標準の attrib.exe (+U: オンライン専用, -P: ピン留め解除) をフォールバック実行
+        if (TryDehydrateViaAttrib(filePath, out var attribError))
+        {
+            errorMessage = null;
+            return true;
+        }
+
+        // 属性がオンライン専用に変わっていれば成功とみなす
+        if (IsCloudOnlyFile(filePath))
+        {
+            errorMessage = null;
+            return true;
+        }
+
+        if (errorMessage == null && attribError != null)
+        {
+            errorMessage = attribError;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Windows 標準の attrib.exe を使用して OneDrive プレースホルダーの属性を変更し、クラウド専用（空き容量解放）にします。
+    /// </summary>
+    private static bool TryDehydrateViaAttrib(string filePath, out string? errorMessage)
+    {
+        errorMessage = null;
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "attrib.exe",
+                Arguments = $"+U -P \"{filePath}\"",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process != null)
+            {
+                if (process.WaitForExit(2000))
+                {
+                    if (process.ExitCode == 0)
+                    {
+                        return true;
+                    }
+                    var err = process.StandardError.ReadToEnd();
+                    errorMessage = $"attrib コマンド実行エラー (ExitCode: {process.ExitCode}): {err.Trim()}";
+                }
+                else
+                {
+                    try { process.Kill(); } catch { }
+                    errorMessage = "attrib コマンド実行がタイムアウトしました。";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"attrib 実行例外: {ex.Message}";
         }
 
         return false;
@@ -304,6 +403,3 @@ public class CloudFileService : ICloudFileService
         }
     }
 }
-
-
-
