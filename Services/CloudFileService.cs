@@ -205,13 +205,15 @@ public class CloudFileService : ICloudFileService
         {
             try
             {
+                // CfDehydratePlaceholder に必要な権限でハンドルを取得
+                // 注: ダウンロード済みファイルはリパースポイントではないため FILE_FLAG_OPEN_REPARSE_POINT は指定しない
                 using var handle = CreateFileW(
                     filePath,
                     FILE_WRITE_DATA | FILE_READ_DATA | FILE_WRITE_ATTRIBUTES | FILE_READ_ATTRIBUTES,
                     FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                     IntPtr.Zero,
                     OPEN_EXISTING,
-                    FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+                    FILE_FLAG_BACKUP_SEMANTICS,
                     IntPtr.Zero);
 
                 if (handle.IsInvalid)
@@ -219,7 +221,7 @@ public class CloudFileService : ICloudFileService
                     int error = Marshal.GetLastWin32Error();
                     if (attempt < 3)
                     {
-                        Thread.Sleep(100);
+                        Thread.Sleep(150);
                         continue;
                     }
                     errorMessage = $"ファイルハンドルの取得に失敗しました (Win32Error: {error})";
@@ -232,7 +234,7 @@ public class CloudFileService : ICloudFileService
                 {
                     if (attempt < 3)
                     {
-                        Thread.Sleep(100);
+                        Thread.Sleep(150);
                         continue;
                     }
                     errorMessage = $"CfDehydratePlaceholder が失敗しました (HRESULT: 0x{hr:X8})";
@@ -250,7 +252,7 @@ public class CloudFileService : ICloudFileService
             {
                 if (attempt < 3)
                 {
-                    Thread.Sleep(100);
+                    Thread.Sleep(150);
                     continue;
                 }
                 errorMessage = $"Dehydrate 実行中に例外が発生しました: {ex.Message}";
@@ -262,17 +264,46 @@ public class CloudFileService : ICloudFileService
     }
 
     /// <summary>
-    /// ローカルにダウンロードされたファイルを非同期でクラウド専用（Dehydrate / 空き容量を増やす）に戻します。
+    /// ローカルにダウンロードされたファイルを非同期でクラウド専用（Dehydrate / 空き容量を増やす）に戻します（最大5秒タイムアウト保護）。
     /// </summary>
-    public Task<(bool success, string? errorMessage)> DehydrateFileAsync(string filePath, CancellationToken cancellationToken = default)
+    public async Task<(bool success, string? errorMessage)> DehydrateFileAsync(string filePath, CancellationToken cancellationToken = default)
     {
-        return Task.Run(() =>
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            bool success = DehydrateFile(filePath, out var errorMessage);
-            return (success, errorMessage);
-        }, cancellationToken);
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+            var dehydrateTask = Task.Run(() =>
+            {
+                linkedCts.Token.ThrowIfCancellationRequested();
+                bool success = DehydrateFile(filePath, out var errorMessage);
+                return (success, errorMessage);
+            }, linkedCts.Token);
+
+            var completedTask = await Task.WhenAny(dehydrateTask, Task.Delay(5000, linkedCts.Token));
+            if (completedTask == dehydrateTask)
+            {
+                return await dehydrateTask;
+            }
+            else
+            {
+                return (false, "クラウド専用化（Dehydrate）処理がタイムアウトしました。");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            return (false, "クラウド専用化（Dehydrate）処理がタイムアウトしました。");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Dehydrate中に例外が発生しました: {ex.Message}");
+        }
     }
 }
+
 
 

@@ -878,10 +878,16 @@ public class PhotoOrganizerService : IPhotoOrganizerService
             return false;
         }
 
+        // 出力先ファイルがオンライン専用プレースホルダーで、サイズおよび更新日時が同一の場合は同一と判定（無駄なダウンロードを回避）
+        if (IsCloudOnlyFile(file2) && fi1.LastWriteTimeUtc == fi2.LastWriteTimeUtc)
+        {
+            return true;
+        }
+
         // Compare MD5 checksums for files with same length
         using var md5 = MD5.Create();
-        using var stream1 = File.OpenRead(file1);
-        using var stream2 = File.OpenRead(file2);
+        using var stream1 = new FileStream(file1, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var stream2 = new FileStream(file2, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
 
         byte[] hash1 = md5.ComputeHash(stream1);
         byte[] hash2 = md5.ComputeHash(stream2);
@@ -889,3 +895,4 @@ public class PhotoOrganizerService : IPhotoOrganizerService
         return hash1.AsSpan().SequenceEqual(hash2);
     }
 }
+
