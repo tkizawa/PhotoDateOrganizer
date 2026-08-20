@@ -89,7 +89,7 @@ public sealed partial class MainWindow : Window
             ViewModel.DestinationDirectory = settings.DestinationDirectory;
         }
 
-        ViewModel.SkipCloudOnlyFiles = settings.SkipCloudOnlyFiles;
+        ViewModel.CloudFileMode = settings.CloudFileMode;
     }
 
     private void SaveCurrentSettings()
@@ -107,7 +107,7 @@ public sealed partial class MainWindow : Window
                 WindowHeight = size.Height,
                 SourceDirectory = ViewModel.SourceDirectory ?? string.Empty,
                 DestinationDirectory = ViewModel.DestinationDirectory ?? string.Empty,
-                SkipCloudOnlyFiles = ViewModel.SkipCloudOnlyFiles
+                CloudFileMode = ViewModel.CloudFileMode
             };
 
             _settingsService.SaveSettings(settings);
@@ -122,6 +122,7 @@ public sealed partial class MainWindow : Window
     {
         if (e.PropertyName is nameof(ViewModel.SourceDirectory) 
             or nameof(ViewModel.DestinationDirectory) 
+            or nameof(ViewModel.CloudFileMode)
             or nameof(ViewModel.SkipCloudOnlyFiles))
         {
             SaveCurrentSettings();

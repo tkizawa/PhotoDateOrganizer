@@ -45,7 +45,7 @@ public class SettingsServiceTests : IDisposable
             WindowY = 200,
             WindowWidth = 1280,
             WindowHeight = 800,
-            SkipCloudOnlyFiles = true
+            CloudFileMode = CloudFileHandlingMode.HydrateAndDehydrate
         };
 
         // Act
@@ -60,6 +60,7 @@ public class SettingsServiceTests : IDisposable
         Assert.Equal(originalSettings.WindowY, importedSettings.WindowY);
         Assert.Equal(originalSettings.WindowWidth, importedSettings.WindowWidth);
         Assert.Equal(originalSettings.WindowHeight, importedSettings.WindowHeight);
+        Assert.Equal(originalSettings.CloudFileMode, importedSettings.CloudFileMode);
         Assert.Equal(originalSettings.SkipCloudOnlyFiles, importedSettings.SkipCloudOnlyFiles);
     }
 

@@ -133,11 +133,27 @@
                                 </Grid>
                             </StackPanel>
 
-                            <!-- Cloud Files Option -->
-                            <CheckBox IsChecked="{x:Bind ViewModel.SkipCloudOnlyFiles, Mode=TwoWay}"
-                                      IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
-                                      Content="OneDrive / SharePoint などのオンライン専用ファイル（未ダウンロード）をスキップする（推奨）"
-                                      ToolTipService.ToolTip="ローカルディスクに実体がないクラウド専用ファイルを整理対象外として安全にスキップします。チェックを外すとダウンロードを試みますが、エラーになる場合があります。" />
+                            <!-- Cloud Files Option Group -->
+                            <StackPanel Spacing="6" Margin="0,4,0,0">
+                                <TextBlock Text="OneDrive / SharePoint オンライン専用（未ダウンロード）ファイルの扱い:" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <StackPanel Spacing="6" Margin="4,0,0,0">
+                                    <RadioButton IsChecked="{x:Bind ViewModel.IsCloudModeHydrateAndDehydrate, Mode=TwoWay}"
+                                                 IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
+                                                 GroupName="CloudFileOptions"
+                                                 Content="一時ダウンロードして整理し、完了後にクラウド専用（空き容量を増やす）に戻す（推奨）"
+                                                 ToolTipService.ToolTip="ローカル容量を圧迫しないよう、Exif解析とコピーに必要な間だけ一時ダウンロードし、整理後に自動で元のオンライン専用状態に戻します。" />
+                                    <RadioButton IsChecked="{x:Bind ViewModel.IsCloudModeSkip, Mode=TwoWay}"
+                                                 IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
+                                                 GroupName="CloudFileOptions"
+                                                 Content="オンライン専用ファイルはスキップする（通信なし）"
+                                                 ToolTipService.ToolTip="通信量を発生させず、ローカルにダウンロード済みのファイルのみを整理対象とします。" />
+                                    <RadioButton IsChecked="{x:Bind ViewModel.IsCloudModeKeepLocal, Mode=TwoWay}"
+                                                 IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
+                                                 GroupName="CloudFileOptions"
+                                                 Content="ダウンロードしてローカルにも実体を保持する"
+                                                 ToolTipService.ToolTip="クラウド専用ファイルをローカルにダウンロードして整理し、その後もローカルにファイルを保持します。" />
+                                </StackPanel>
+                            </StackPanel>
 
                             <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
                                      Message="対象形式: .jpg, .jpeg, .heic, .png, .mov, .mp4（同名ファイルはハッシュ比較で自動判別・連番付与）" />

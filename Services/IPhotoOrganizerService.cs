@@ -12,5 +12,13 @@ public interface IPhotoOrganizerService
         string destinationDirectory,
         IProgress<OrganizeProgress> progress,
         CancellationToken cancellationToken,
+        CloudFileHandlingMode cloudFileMode);
+
+    Task<OrganizeResult> OrganizeAsync(
+        string sourceDirectory,
+        string destinationDirectory,
+        IProgress<OrganizeProgress> progress,
+        CancellationToken cancellationToken,
         bool skipCloudOnlyFiles = true);
 }
+

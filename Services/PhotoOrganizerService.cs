@@ -18,6 +18,13 @@ namespace PhotoDateOrganizer.Services;
 
 public class PhotoOrganizerService : IPhotoOrganizerService
 {
+    private readonly ICloudFileService _cloudFileService;
+
+    public PhotoOrganizerService(ICloudFileService? cloudFileService = null)
+    {
+        _cloudFileService = cloudFileService ?? new CloudFileService();
+    }
+
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".jpg",
@@ -132,12 +139,27 @@ public class PhotoOrganizerService : IPhotoOrganizerService
         return false;
     }
 
-    public async Task<OrganizeResult> OrganizeAsync(
+    public Task<OrganizeResult> OrganizeAsync(
         string sourceDirectory,
         string destinationDirectory,
         IProgress<OrganizeProgress> progress,
         CancellationToken cancellationToken,
         bool skipCloudOnlyFiles = true)
+    {
+        return OrganizeAsync(
+            sourceDirectory,
+            destinationDirectory,
+            progress,
+            cancellationToken,
+            skipCloudOnlyFiles ? CloudFileHandlingMode.Skip : CloudFileHandlingMode.HydrateAndDehydrate);
+    }
+
+    public async Task<OrganizeResult> OrganizeAsync(
+        string sourceDirectory,
+        string destinationDirectory,
+        IProgress<OrganizeProgress> progress,
+        CancellationToken cancellationToken,
+        CloudFileHandlingMode cloudFileMode)
     {
         var stopwatch = Stopwatch.StartNew();
         int copiedCount = 0;
@@ -215,10 +237,36 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 var fileName = Path.GetFileName(sourceFile);
                 int currentIndex = i + 1;
 
-                // 0. クラウド専用ファイル（未ダウンロード）の事前チェック
-                if (skipCloudOnlyFiles && IsCloudOnlyFile(sourceFile))
+                // 0. クラウド専用ファイル（未ダウンロード）の事前チェックと必要に応じた一時ダウンロード
+                bool isOriginallyCloudOnly = _cloudFileService.IsCloudOnlyFile(sourceFile);
+
+                if (isOriginallyCloudOnly)
                 {
-                    skippedCount++;
+                    if (cloudFileMode == CloudFileHandlingMode.Skip)
+                    {
+                        skippedCount++;
+                        progress.Report(new OrganizeProgress
+                        {
+                            Phase = OrganizePhase.Organizing,
+                            ProcessedCount = currentIndex,
+                            TotalCount = totalFiles,
+                            CopiedCount = copiedCount,
+                            SkippedCount = skippedCount,
+                            ErrorCount = errorCount,
+                            FallbackCount = fallbackCount,
+                            CurrentFilePath = sourceFile,
+                            StatusMessage = $"スキップ: {fileName}（OneDrive/クラウド専用ファイル）",
+                            NewLogEntry = new LogEntry
+                            {
+                                Level = LogLevel.Warning,
+                                Message = $"[スキップ] クラウド専用ファイルのためスキップしました（ローカルに未ダウンロード）: {fileName}",
+                                FilePath = sourceFile
+                            }
+                        });
+                        continue;
+                    }
+
+                    // 一時ダウンロード (Hydrate)
                     progress.Report(new OrganizeProgress
                     {
                         Phase = OrganizePhase.Organizing,
@@ -229,15 +277,39 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                         ErrorCount = errorCount,
                         FallbackCount = fallbackCount,
                         CurrentFilePath = sourceFile,
-                        StatusMessage = $"スキップ: {fileName}（OneDrive/クラウド専用ファイル）",
+                        StatusMessage = $"ダウンロード中: {fileName} (クラウドから取得中...)",
                         NewLogEntry = new LogEntry
                         {
-                            Level = LogLevel.Warning,
-                            Message = $"[スキップ] クラウド専用ファイルのためスキップしました（ローカルに未ダウンロード）: {fileName}",
+                            Level = LogLevel.Info,
+                            Message = $"[ダウンロード中] クラウド専用ファイルを一時ダウンロードしています: {fileName}",
                             FilePath = sourceFile
                         }
                     });
-                    continue;
+
+                    bool downloadSuccess = await _cloudFileService.HydrateFileAsync(sourceFile, cancellationToken);
+                    if (!downloadSuccess)
+                    {
+                        errorCount++;
+                        progress.Report(new OrganizeProgress
+                        {
+                            Phase = OrganizePhase.Organizing,
+                            ProcessedCount = currentIndex,
+                            TotalCount = totalFiles,
+                            CopiedCount = copiedCount,
+                            SkippedCount = skippedCount,
+                            ErrorCount = errorCount,
+                            FallbackCount = fallbackCount,
+                            CurrentFilePath = sourceFile,
+                            StatusMessage = $"エラー: {fileName} (ダウンロード失敗)",
+                            NewLogEntry = new LogEntry
+                            {
+                                Level = LogLevel.Error,
+                                Message = $"[エラー] {fileName}: クラウドからのダウンロードに失敗しました。",
+                                FilePath = sourceFile
+                            }
+                        });
+                        continue;
+                    }
                 }
 
                 try
@@ -357,7 +429,56 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                         }
                     });
                 }
+                finally
+                {
+                    // 4. 元々クラウド専用ファイルであり、HydrateAndDehydrateモードの場合はクラウド専用（空き容量解放）に戻す
+                    if (isOriginallyCloudOnly && cloudFileMode == CloudFileHandlingMode.HydrateAndDehydrate)
+                    {
+                        bool dehydrateSuccess = _cloudFileService.DehydrateFile(sourceFile, out var dehydrateError);
+                        if (dehydrateSuccess)
+                        {
+                            progress.Report(new OrganizeProgress
+                            {
+                                Phase = OrganizePhase.Organizing,
+                                ProcessedCount = currentIndex,
+                                TotalCount = totalFiles,
+                                CopiedCount = copiedCount,
+                                SkippedCount = skippedCount,
+                                ErrorCount = errorCount,
+                                FallbackCount = fallbackCount,
+                                CurrentFilePath = sourceFile,
+                                NewLogEntry = new LogEntry
+                                {
+                                    Level = LogLevel.Info,
+                                    Message = $"[クラウド専用化] {fileName} をクラウド専用（空き容量解放）に戻しました。",
+                                    FilePath = sourceFile
+                                }
+                            });
+                        }
+                        else
+                        {
+                            progress.Report(new OrganizeProgress
+                            {
+                                Phase = OrganizePhase.Organizing,
+                                ProcessedCount = currentIndex,
+                                TotalCount = totalFiles,
+                                CopiedCount = copiedCount,
+                                SkippedCount = skippedCount,
+                                ErrorCount = errorCount,
+                                FallbackCount = fallbackCount,
+                                CurrentFilePath = sourceFile,
+                                NewLogEntry = new LogEntry
+                                {
+                                    Level = LogLevel.Warning,
+                                    Message = $"[注意] {fileName} をクラウド専用に戻せませんでした: {dehydrateError}",
+                                    FilePath = sourceFile
+                                }
+                            });
+                        }
+                    }
+                }
             }
+
 
             stopwatch.Stop();
 

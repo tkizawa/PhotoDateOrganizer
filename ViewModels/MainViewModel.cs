@@ -34,7 +34,66 @@ public partial class MainViewModel : ObservableObject
     private bool _isProcessing;
 
     [ObservableProperty]
-    private bool _skipCloudOnlyFiles = true;
+    [NotifyPropertyChangedFor(nameof(IsCloudModeHydrateAndDehydrate))]
+    [NotifyPropertyChangedFor(nameof(IsCloudModeSkip))]
+    [NotifyPropertyChangedFor(nameof(IsCloudModeKeepLocal))]
+    [NotifyPropertyChangedFor(nameof(SkipCloudOnlyFiles))]
+    private CloudFileHandlingMode _cloudFileMode = CloudFileHandlingMode.HydrateAndDehydrate;
+
+    /// <summary>
+    /// 一時ダウンロードして整理し、完了後にクラウド専用に戻す
+    /// </summary>
+    public bool IsCloudModeHydrateAndDehydrate
+    {
+        get => CloudFileMode == CloudFileHandlingMode.HydrateAndDehydrate;
+        set
+        {
+            if (value)
+            {
+                CloudFileMode = CloudFileHandlingMode.HydrateAndDehydrate;
+            }
+        }
+    }
+
+    /// <summary>
+    /// クラウド専用ファイルはスキップする
+    /// </summary>
+    public bool IsCloudModeSkip
+    {
+        get => CloudFileMode == CloudFileHandlingMode.Skip;
+        set
+        {
+            if (value)
+            {
+                CloudFileMode = CloudFileHandlingMode.Skip;
+            }
+        }
+    }
+
+    /// <summary>
+    /// クラウドからダウンロードしてローカルにも実体を保持する
+    /// </summary>
+    public bool IsCloudModeKeepLocal
+    {
+        get => CloudFileMode == CloudFileHandlingMode.DownloadAndKeep;
+        set
+        {
+            if (value)
+            {
+                CloudFileMode = CloudFileHandlingMode.DownloadAndKeep;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 以前のプロパティとの下位互換性
+    /// </summary>
+    public bool SkipCloudOnlyFiles
+    {
+        get => CloudFileMode == CloudFileHandlingMode.Skip;
+        set => CloudFileMode = value ? CloudFileHandlingMode.Skip : CloudFileHandlingMode.HydrateAndDehydrate;
+    }
+
 
     public bool IsIdle => !IsProcessing;
 
@@ -170,7 +229,8 @@ public partial class MainViewModel : ObservableObject
                 DestinationDirectory,
                 progressHandler,
                 _cancellationTokenSource.Token,
-                SkipCloudOnlyFiles);
+                CloudFileMode);
+
 
             if (result.IsCancelled)
             {
