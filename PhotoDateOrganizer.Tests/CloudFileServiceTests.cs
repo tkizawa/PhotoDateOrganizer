@@ -61,7 +61,15 @@ public class CloudFileServiceTests : IDisposable
             errorMessage = DehydrateResult ? null : "Dehydrate simulated failure";
             return DehydrateResult;
         }
+
+        public Task<(bool success, string? errorMessage)> DehydrateFileAsync(string filePath, CancellationToken cancellationToken = default)
+        {
+            DehydrateCallCount++;
+            string? errorMessage = DehydrateResult ? null : "Dehydrate simulated failure";
+            return Task.FromResult((DehydrateResult, errorMessage));
+        }
     }
+
 
     [Fact]
     public async Task OrganizeAsync_CloudOnlyFile_WithSkipMode_ShouldSkip()

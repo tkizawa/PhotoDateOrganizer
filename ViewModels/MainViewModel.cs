@@ -224,12 +224,18 @@ public partial class MainViewModel : ObservableObject
         try
         {
             AddLog(LogLevel.Info, $"整理処理を開始します...");
-            var result = await _organizerService.OrganizeAsync(
-                SourceDirectory,
-                DestinationDirectory,
+            var sourceDir = SourceDirectory;
+            var destDir = DestinationDirectory;
+            var cloudMode = CloudFileMode;
+            var token = _cancellationTokenSource.Token;
+
+            var result = await Task.Run(() => _organizerService.OrganizeAsync(
+                sourceDir,
+                destDir,
                 progressHandler,
-                _cancellationTokenSource.Token,
-                CloudFileMode);
+                token,
+                cloudMode), token);
+
 
 
             if (result.IsCancelled)

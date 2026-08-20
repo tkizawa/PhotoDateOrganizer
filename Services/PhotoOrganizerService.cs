@@ -434,8 +434,9 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                     // 4. 元々クラウド専用ファイルであり、HydrateAndDehydrateモードの場合はクラウド専用（空き容量解放）に戻す
                     if (isOriginallyCloudOnly && cloudFileMode == CloudFileHandlingMode.HydrateAndDehydrate)
                     {
-                        bool dehydrateSuccess = _cloudFileService.DehydrateFile(sourceFile, out var dehydrateError);
+                        var (dehydrateSuccess, dehydrateError) = await _cloudFileService.DehydrateFileAsync(sourceFile, CancellationToken.None);
                         if (dehydrateSuccess)
+
                         {
                             progress.Report(new OrganizeProgress
                             {

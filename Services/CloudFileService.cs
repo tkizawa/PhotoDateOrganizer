@@ -26,7 +26,13 @@ public interface ICloudFileService
     /// ローカルにダウンロードされたファイルをクラウド専用（Dehydrate / 空き容量を増やす）に戻します。
     /// </summary>
     bool DehydrateFile(string filePath, out string? errorMessage);
+
+    /// <summary>
+    /// ローカルにダウンロードされたファイルを非同期でクラウド専用（Dehydrate / 空き容量を増やす）に戻します。
+    /// </summary>
+    Task<(bool success, string? errorMessage)> DehydrateFileAsync(string filePath, CancellationToken cancellationToken = default);
 }
+
 
 /// <summary>
 /// Windows Cloud Filter API (cldapi.dll) を利用したクラウドファイル操作サービスの実装
@@ -253,4 +259,18 @@ public class CloudFileService : ICloudFileService
             return false;
         }
     }
+
+    /// <summary>
+    /// ローカルにダウンロードされたファイルを非同期でクラウド専用（Dehydrate / 空き容量を増やす）に戻します。
+    /// </summary>
+    public Task<(bool success, string? errorMessage)> DehydrateFileAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            bool success = DehydrateFile(filePath, out var errorMessage);
+            return (success, errorMessage);
+        }, cancellationToken);
+    }
 }
+
