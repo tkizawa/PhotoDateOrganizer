@@ -133,58 +133,39 @@ public class CloudFileService : ICloudFileService
             return true;
         }
 
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // アプローチ1: cldapi.dll の CfHydratePlaceholder を試行
+            // Windows Cloud Filter は通常 FileStream で読み込みアクセスを行うことで
+            // カーネルドライバが同期的にクラウドから完全ダウンロードを実行します。
             try
             {
-                using var handle = CreateFileW(
-                    filePath,
-                    GENERIC_READ | FILE_READ_ATTRIBUTES,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                    IntPtr.Zero,
-                    OPEN_EXISTING,
-                    FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
-                    IntPtr.Zero);
-
-                if (!handle.IsInvalid)
-                {
-                    int hr = CfHydratePlaceholder(handle, 0, -1, CF_HYDRATE_FLAG_NONE, IntPtr.Zero);
-                    if (hr == 0) // S_OK
-                    {
-                        return true;
-                    }
-                }
-            }
-            catch (DllNotFoundException)
-            {
-                // cldapi.dll がない環境の場合はストリーム読み込みフォールバックへ
-            }
-            catch (EntryPointNotFoundException)
-            {
-                // エントリポイントがない場合もフォールバックへ
-            }
-            catch
-            {
-                // その他の例外時もフォールバックを試みる
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            // アプローチ2: ファイルを読み込みオープンして Windows Cloud Filter に自動ダウンロードさせる
-            try
-            {
-                const int bufferSize = 81920;
+                const int bufferSize = 128 * 1024; // 128KB
                 var buffer = new byte[bufferSize];
-                using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize, FileOptions.SequentialScan))
+
+                using (var fs = new FileStream(
+                    filePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite,
+                    bufferSize,
+                    FileOptions.SequentialScan | FileOptions.Asynchronous))
                 {
-                    // 先頭だけでなく全体をストリームで読み切ることで完全ダウンロードを保証
-                    while (fs.Read(buffer, 0, buffer.Length) > 0)
+                    while (await fs.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken) > 0)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                     }
+                }
+
+                // ダウンロード完了後にオンライン専用フラグが解除されているか確認（最大2秒ポーリング）
+                for (int i = 0; i < 20; i++)
+                {
+                    if (!IsCloudOnlyFile(filePath))
+                    {
+                        return true;
+                    }
+                    await Task.Delay(100, cancellationToken);
                 }
 
                 return !IsCloudOnlyFile(filePath);
@@ -219,45 +200,65 @@ public class CloudFileService : ICloudFileService
             return true;
         }
 
-        try
+        // 直前のファイルアクセス（コピー等）のハンドル解放待ちのため、最大3回リトライ
+        for (int attempt = 1; attempt <= 3; attempt++)
         {
-            // CfDehydratePlaceholder に必要な権限でハンドルを取得
-            using var handle = CreateFileW(
-                filePath,
-                FILE_WRITE_DATA | FILE_READ_DATA | FILE_WRITE_ATTRIBUTES | FILE_READ_ATTRIBUTES,
-                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                IntPtr.Zero,
-                OPEN_EXISTING,
-                FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
-                IntPtr.Zero);
-
-            if (handle.IsInvalid)
+            try
             {
-                int error = Marshal.GetLastWin32Error();
-                errorMessage = $"ファイルハンドルの取得に失敗しました (Win32Error: {error})";
+                using var handle = CreateFileW(
+                    filePath,
+                    FILE_WRITE_DATA | FILE_READ_DATA | FILE_WRITE_ATTRIBUTES | FILE_READ_ATTRIBUTES,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    IntPtr.Zero,
+                    OPEN_EXISTING,
+                    FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+                    IntPtr.Zero);
+
+                if (handle.IsInvalid)
+                {
+                    int error = Marshal.GetLastWin32Error();
+                    if (attempt < 3)
+                    {
+                        Thread.Sleep(100);
+                        continue;
+                    }
+                    errorMessage = $"ファイルハンドルの取得に失敗しました (Win32Error: {error})";
+                    return false;
+                }
+
+                // CfDehydratePlaceholder を呼び出し、ファイル全体 (StartingOffset=0, Length=-1) を解放
+                int hr = CfDehydratePlaceholder(handle, 0, -1, CF_DEHYDRATE_FLAG_NONE, IntPtr.Zero);
+                if (hr != 0) // S_OK 以外
+                {
+                    if (attempt < 3)
+                    {
+                        Thread.Sleep(100);
+                        continue;
+                    }
+                    errorMessage = $"CfDehydratePlaceholder が失敗しました (HRESULT: 0x{hr:X8})";
+                    return false;
+                }
+
+                return true;
+            }
+            catch (DllNotFoundException)
+            {
+                errorMessage = "cldapi.dll が見つかりません。このバージョンの Windows では Dehydrate をサポートしていません。";
                 return false;
             }
-
-            // CfDehydratePlaceholder を呼び出し、ファイル全体 (StartingOffset=0, Length=-1) を解放
-            int hr = CfDehydratePlaceholder(handle, 0, -1, CF_DEHYDRATE_FLAG_NONE, IntPtr.Zero);
-            if (hr != 0) // S_OK 以外
+            catch (Exception ex)
             {
-                errorMessage = $"CfDehydratePlaceholder が失敗しました (HRESULT: 0x{hr:X8})";
+                if (attempt < 3)
+                {
+                    Thread.Sleep(100);
+                    continue;
+                }
+                errorMessage = $"Dehydrate 実行中に例外が発生しました: {ex.Message}";
                 return false;
             }
+        }
 
-            return true;
-        }
-        catch (DllNotFoundException)
-        {
-            errorMessage = "cldapi.dll が見つかりません。このバージョンの Windows では Dehydrate をサポートしていません。";
-            return false;
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Dehydrate 実行中に例外が発生しました: {ex.Message}";
-            return false;
-        }
+        return false;
     }
 
     /// <summary>
@@ -273,4 +274,5 @@ public class CloudFileService : ICloudFileService
         }, cancellationToken);
     }
 }
+
 

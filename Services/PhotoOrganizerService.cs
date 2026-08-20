@@ -236,86 +236,89 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 var sourceFile = files[i];
                 var fileName = Path.GetFileName(sourceFile);
                 int currentIndex = i + 1;
-
-                // 0. クラウド専用ファイル（未ダウンロード）の事前チェックと必要に応じた一時ダウンロード
-                bool isOriginallyCloudOnly = _cloudFileService.IsCloudOnlyFile(sourceFile);
-
-                if (isOriginallyCloudOnly)
-                {
-                    if (cloudFileMode == CloudFileHandlingMode.Skip)
-                    {
-                        skippedCount++;
-                        progress.Report(new OrganizeProgress
-                        {
-                            Phase = OrganizePhase.Organizing,
-                            ProcessedCount = currentIndex,
-                            TotalCount = totalFiles,
-                            CopiedCount = copiedCount,
-                            SkippedCount = skippedCount,
-                            ErrorCount = errorCount,
-                            FallbackCount = fallbackCount,
-                            CurrentFilePath = sourceFile,
-                            StatusMessage = $"スキップ: {fileName}（OneDrive/クラウド専用ファイル）",
-                            NewLogEntry = new LogEntry
-                            {
-                                Level = LogLevel.Warning,
-                                Message = $"[スキップ] クラウド専用ファイルのためスキップしました（ローカルに未ダウンロード）: {fileName}",
-                                FilePath = sourceFile
-                            }
-                        });
-                        continue;
-                    }
-
-                    // 一時ダウンロード (Hydrate)
-                    progress.Report(new OrganizeProgress
-                    {
-                        Phase = OrganizePhase.Organizing,
-                        ProcessedCount = currentIndex,
-                        TotalCount = totalFiles,
-                        CopiedCount = copiedCount,
-                        SkippedCount = skippedCount,
-                        ErrorCount = errorCount,
-                        FallbackCount = fallbackCount,
-                        CurrentFilePath = sourceFile,
-                        StatusMessage = $"ダウンロード中: {fileName} (クラウドから取得中...)",
-                        NewLogEntry = new LogEntry
-                        {
-                            Level = LogLevel.Info,
-                            Message = $"[ダウンロード中] クラウド専用ファイルを一時ダウンロードしています: {fileName}",
-                            FilePath = sourceFile
-                        }
-                    });
-
-                    bool downloadSuccess = await _cloudFileService.HydrateFileAsync(sourceFile, cancellationToken);
-                    if (!downloadSuccess)
-                    {
-                        errorCount++;
-                        progress.Report(new OrganizeProgress
-                        {
-                            Phase = OrganizePhase.Organizing,
-                            ProcessedCount = currentIndex,
-                            TotalCount = totalFiles,
-                            CopiedCount = copiedCount,
-                            SkippedCount = skippedCount,
-                            ErrorCount = errorCount,
-                            FallbackCount = fallbackCount,
-                            CurrentFilePath = sourceFile,
-                            StatusMessage = $"エラー: {fileName} (ダウンロード失敗)",
-                            NewLogEntry = new LogEntry
-                            {
-                                Level = LogLevel.Error,
-                                Message = $"[エラー] {fileName}: クラウドからのダウンロードに失敗しました。",
-                                FilePath = sourceFile
-                            }
-                        });
-                        continue;
-                    }
-                }
+                bool isHydratedByUs = false;
 
                 try
                 {
+                    // 0. クラウド専用ファイル（未ダウンロード）の事前チェックと必要に応じた一時ダウンロード
+                    bool isOriginallyCloudOnly = _cloudFileService.IsCloudOnlyFile(sourceFile);
+
+                    if (isOriginallyCloudOnly)
+                    {
+                        if (cloudFileMode == CloudFileHandlingMode.Skip)
+                        {
+                            skippedCount++;
+                            progress.Report(new OrganizeProgress
+                            {
+                                Phase = OrganizePhase.Organizing,
+                                ProcessedCount = currentIndex,
+                                TotalCount = totalFiles,
+                                CopiedCount = copiedCount,
+                                SkippedCount = skippedCount,
+                                ErrorCount = errorCount,
+                                FallbackCount = fallbackCount,
+                                CurrentFilePath = sourceFile,
+                                StatusMessage = $"スキップ: {fileName}（OneDrive/クラウド専用ファイル）",
+                                NewLogEntry = new LogEntry
+                                {
+                                    Level = LogLevel.Warning,
+                                    Message = $"[スキップ] クラウド専用ファイルのためスキップしました（ローカルに未ダウンロード）: {fileName}",
+                                    FilePath = sourceFile
+                                }
+                            });
+                            continue;
+                        }
+
+                        // 一時ダウンロード (Hydrate)
+                        progress.Report(new OrganizeProgress
+                        {
+                            Phase = OrganizePhase.Organizing,
+                            ProcessedCount = currentIndex,
+                            TotalCount = totalFiles,
+                            CopiedCount = copiedCount,
+                            SkippedCount = skippedCount,
+                            ErrorCount = errorCount,
+                            FallbackCount = fallbackCount,
+                            CurrentFilePath = sourceFile,
+                            StatusMessage = $"ダウンロード中: {fileName} (クラウドから取得中...)",
+                            NewLogEntry = new LogEntry
+                            {
+                                Level = LogLevel.Info,
+                                Message = $"[ダウンロード中] クラウド専用ファイルを一時ダウンロードしています: {fileName}",
+                                FilePath = sourceFile
+                            }
+                        });
+
+                        bool downloadSuccess = await _cloudFileService.HydrateFileAsync(sourceFile, cancellationToken);
+                        if (!downloadSuccess)
+                        {
+                            errorCount++;
+                            progress.Report(new OrganizeProgress
+                            {
+                                Phase = OrganizePhase.Organizing,
+                                ProcessedCount = currentIndex,
+                                TotalCount = totalFiles,
+                                CopiedCount = copiedCount,
+                                SkippedCount = skippedCount,
+                                ErrorCount = errorCount,
+                                FallbackCount = fallbackCount,
+                                CurrentFilePath = sourceFile,
+                                StatusMessage = $"エラー: {fileName} (ダウンロード失敗)",
+                                NewLogEntry = new LogEntry
+                                {
+                                    Level = LogLevel.Error,
+                                    Message = $"[エラー] {fileName}: クラウドからのダウンロードに失敗しました。",
+                                    FilePath = sourceFile
+                                }
+                            });
+                            continue;
+                        }
+
+                        isHydratedByUs = true;
+                    }
+
                     // 1. Extract Date
-                    var (captureDate, dateSource, detailInfo) = await Task.Run(() => ExtractDateTaken(sourceFile), cancellationToken);
+                    var (captureDate, dateSource, detailInfo) = ExtractDateTaken(sourceFile);
 
                     bool isFallback = dateSource is DateSourceType.FilenamePattern or DateSourceType.FileCreationTime or DateSourceType.FileModifiedTime;
                     if (isFallback)
@@ -340,7 +343,7 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                     }
 
                     // 3. Resolve File Name Conflicts
-                    var (targetFilePath, isDuplicate) = await Task.Run(() => ResolveTargetFilePath(sourceFile, targetFolder), cancellationToken);
+                    var (targetFilePath, isDuplicate) = ResolveTargetFilePath(sourceFile, targetFolder);
 
                     if (isDuplicate)
                     {
@@ -367,7 +370,7 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                     else
                     {
                         // Copy file safely
-                        await Task.Run(() => File.Copy(sourceFile, targetFilePath, overwrite: false), cancellationToken);
+                        File.Copy(sourceFile, targetFilePath, overwrite: false);
                         copiedCount++;
 
                         var (logLevel, note) = dateSource switch
@@ -431,8 +434,8 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 }
                 finally
                 {
-                    // 4. 元々クラウド専用ファイルであり、HydrateAndDehydrateモードの場合はクラウド専用（空き容量解放）に戻す
-                    if (isOriginallyCloudOnly && cloudFileMode == CloudFileHandlingMode.HydrateAndDehydrate)
+                    // 4. 当該処理で一時ダウンロードしたファイルであり、HydrateAndDehydrateモードの場合はクラウド専用（空き容量解放）に戻す
+                    if (isHydratedByUs && cloudFileMode == CloudFileHandlingMode.HydrateAndDehydrate)
                     {
                         var (dehydrateSuccess, dehydrateError) = await _cloudFileService.DehydrateFileAsync(sourceFile, CancellationToken.None);
                         if (dehydrateSuccess)
@@ -479,6 +482,7 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                     }
                 }
             }
+
 
 
             stopwatch.Stop();

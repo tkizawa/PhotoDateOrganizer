@@ -144,6 +144,39 @@ public class CloudFileServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task OrganizeAsync_MultipleCloudOnlyFiles_ShouldProcessAllSequentially()
+    {
+        // Arrange
+        var fakeCloudService = new FakeCloudFileService { IsCloudOnly = true, HydrateResult = true, DehydrateResult = true };
+        var service = new PhotoOrganizerService(fakeCloudService);
+
+        var file1 = Path.Combine(_sourceDir, "IMG_20230308_143000.jpg");
+        var file2 = Path.Combine(_sourceDir, "IMG_20230309_150000.jpg");
+        var file3 = Path.Combine(_sourceDir, "IMG_20230310_160000.jpg");
+        await File.WriteAllBytesAsync(file1, new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 });
+        await File.WriteAllBytesAsync(file2, new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 });
+        await File.WriteAllBytesAsync(file3, new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 });
+
+        var progress = new Progress<OrganizeProgress>(_ => { });
+
+        // Act
+        var result = await service.OrganizeAsync(_sourceDir, _destDir, progress, CancellationToken.None, CloudFileHandlingMode.HydrateAndDehydrate);
+
+        // Assert
+        Assert.Equal(3, result.TotalScanned);
+        Assert.Equal(3, result.CopiedCount);
+        Assert.Equal(0, result.SkippedCount);
+        Assert.Equal(0, result.ErrorCount);
+        Assert.Equal(3, fakeCloudService.HydrateCallCount);
+        Assert.Equal(3, fakeCloudService.DehydrateCallCount);
+
+        Assert.True(File.Exists(Path.Combine(_destDir, "2023", "2023-03", "2023-03-08", "IMG_20230308_143000.jpg")));
+        Assert.True(File.Exists(Path.Combine(_destDir, "2023", "2023-03", "2023-03-09", "IMG_20230309_150000.jpg")));
+        Assert.True(File.Exists(Path.Combine(_destDir, "2023", "2023-03", "2023-03-10", "IMG_20230310_160000.jpg")));
+    }
+
+
+    [Fact]
     public async Task OrganizeAsync_CloudOnlyFile_HydrateFailure_ShouldCountAsError()
     {
         // Arrange
