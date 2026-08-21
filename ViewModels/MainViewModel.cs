@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -34,23 +34,22 @@ public partial class MainViewModel : ObservableObject
     private bool _isProcessing;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsCloudModeHydrateAndDehydrate))]
+    [NotifyPropertyChangedFor(nameof(IsCloudModeDownload))]
     [NotifyPropertyChangedFor(nameof(IsCloudModeSkip))]
-    [NotifyPropertyChangedFor(nameof(IsCloudModeKeepLocal))]
     [NotifyPropertyChangedFor(nameof(SkipCloudOnlyFiles))]
-    private CloudFileHandlingMode _cloudFileMode = CloudFileHandlingMode.HydrateAndDehydrate;
+    private CloudFileHandlingMode _cloudFileMode = CloudFileHandlingMode.Download;
 
     /// <summary>
-    /// 一時ダウンロードして整理し、完了後にクラウド専用に戻す
+    /// クラウド専用ファイルをダウンロードして整理する（推奨）
     /// </summary>
-    public bool IsCloudModeHydrateAndDehydrate
+    public bool IsCloudModeDownload
     {
-        get => CloudFileMode == CloudFileHandlingMode.HydrateAndDehydrate;
+        get => CloudFileMode == CloudFileHandlingMode.Download;
         set
         {
             if (value)
             {
-                CloudFileMode = CloudFileHandlingMode.HydrateAndDehydrate;
+                CloudFileMode = CloudFileHandlingMode.Download;
             }
         }
     }
@@ -71,29 +70,13 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// クラウドからダウンロードしてローカルにも実体を保持する
-    /// </summary>
-    public bool IsCloudModeKeepLocal
-    {
-        get => CloudFileMode == CloudFileHandlingMode.DownloadAndKeep;
-        set
-        {
-            if (value)
-            {
-                CloudFileMode = CloudFileHandlingMode.DownloadAndKeep;
-            }
-        }
-    }
-
-    /// <summary>
     /// 以前のプロパティとの下位互換性
     /// </summary>
     public bool SkipCloudOnlyFiles
     {
         get => CloudFileMode == CloudFileHandlingMode.Skip;
-        set => CloudFileMode = value ? CloudFileHandlingMode.Skip : CloudFileHandlingMode.HydrateAndDehydrate;
+        set => CloudFileMode = value ? CloudFileHandlingMode.Skip : CloudFileHandlingMode.Download;
     }
-
 
     public bool IsIdle => !IsProcessing;
 

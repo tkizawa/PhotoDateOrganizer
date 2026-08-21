@@ -1,4 +1,4 @@
-namespace PhotoDateOrganizer.Models;
+﻿namespace PhotoDateOrganizer.Models;
 
 public class AppSettings
 {
@@ -12,7 +12,7 @@ public class AppSettings
     /// <summary>
     /// OneDriveやSharePointなどのオンライン専用（未ダウンロード）ファイルの処理モード
     /// </summary>
-    public CloudFileHandlingMode CloudFileMode { get; set; } = CloudFileHandlingMode.HydrateAndDehydrate;
+    public CloudFileHandlingMode CloudFileMode { get; set; } = CloudFileHandlingMode.Download;
 
     /// <summary>
     /// 以前のバージョンとの互換性のためのフラグ（CloudFileModeと連動）
@@ -28,9 +28,8 @@ public class AppSettings
             }
             else if (!value && CloudFileMode == CloudFileHandlingMode.Skip)
             {
-                CloudFileMode = CloudFileHandlingMode.HydrateAndDehydrate;
+                CloudFileMode = CloudFileHandlingMode.Download;
             }
         }
     }
 }
-

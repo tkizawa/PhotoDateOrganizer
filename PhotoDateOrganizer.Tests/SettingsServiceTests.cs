@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using PhotoDateOrganizer.Models;
 using PhotoDateOrganizer.Services;
@@ -45,7 +45,7 @@ public class SettingsServiceTests : IDisposable
             WindowY = 200,
             WindowWidth = 1280,
             WindowHeight = 800,
-            CloudFileMode = CloudFileHandlingMode.HydrateAndDehydrate
+            CloudFileMode = CloudFileHandlingMode.Download
         };
 
         // Act

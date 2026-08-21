@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -151,7 +151,7 @@ public class PhotoOrganizerService : IPhotoOrganizerService
             destinationDirectory,
             progress,
             cancellationToken,
-            skipCloudOnlyFiles ? CloudFileHandlingMode.Skip : CloudFileHandlingMode.HydrateAndDehydrate);
+            skipCloudOnlyFiles ? CloudFileHandlingMode.Skip : CloudFileHandlingMode.Download);
     }
 
     public async Task<OrganizeResult> OrganizeAsync(
@@ -236,7 +236,7 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 var sourceFile = files[i];
                 var fileName = Path.GetFileName(sourceFile);
                 int currentIndex = i + 1;
-                bool isHydratedByUs = false;
+
 
                 try
                 {
@@ -314,7 +314,7 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                             continue;
                         }
 
-                        isHydratedByUs = true;
+
                     }
 
                     // 1. Extract Date
@@ -432,58 +432,7 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                         }
                     });
                 }
-                finally
-                {
-                    // 4. 当該処理で一時ダウンロードしたファイルであり、HydrateAndDehydrateモードの場合はクラウド専用（空き容量解放）に戻す
-                    if (isHydratedByUs && cloudFileMode == CloudFileHandlingMode.HydrateAndDehydrate)
-                    {
-                        var (dehydrateSuccess, dehydrateError) = await _cloudFileService.DehydrateFileAsync(sourceFile, CancellationToken.None);
-                        if (dehydrateSuccess)
-
-                        {
-                            progress.Report(new OrganizeProgress
-                            {
-                                Phase = OrganizePhase.Organizing,
-                                ProcessedCount = currentIndex,
-                                TotalCount = totalFiles,
-                                CopiedCount = copiedCount,
-                                SkippedCount = skippedCount,
-                                ErrorCount = errorCount,
-                                FallbackCount = fallbackCount,
-                                CurrentFilePath = sourceFile,
-                                NewLogEntry = new LogEntry
-                                {
-                                    Level = LogLevel.Info,
-                                    Message = $"[クラウド専用化] {fileName} をクラウド専用（空き容量解放）に戻しました。",
-                                    FilePath = sourceFile
-                                }
-                            });
-                        }
-                        else
-                        {
-                            progress.Report(new OrganizeProgress
-                            {
-                                Phase = OrganizePhase.Organizing,
-                                ProcessedCount = currentIndex,
-                                TotalCount = totalFiles,
-                                CopiedCount = copiedCount,
-                                SkippedCount = skippedCount,
-                                ErrorCount = errorCount,
-                                FallbackCount = fallbackCount,
-                                CurrentFilePath = sourceFile,
-                                NewLogEntry = new LogEntry
-                                {
-                                    Level = LogLevel.Warning,
-                                    Message = $"[注意] {fileName} をクラウド専用に戻せませんでした: {dehydrateError}",
-                                    FilePath = sourceFile
-                                }
-                            });
-                        }
-                    }
-                }
             }
-
-
 
             stopwatch.Stop();
 

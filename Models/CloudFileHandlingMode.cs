@@ -1,4 +1,4 @@
-namespace PhotoDateOrganizer.Models;
+﻿namespace PhotoDateOrganizer.Models;
 
 /// <summary>
 /// OneDrive / SharePoint 等のオンライン専用（未ダウンロード）ファイルの処理モード
@@ -6,9 +6,9 @@ namespace PhotoDateOrganizer.Models;
 public enum CloudFileHandlingMode
 {
     /// <summary>
-    /// 一時ダウンロードしてExif解析・整理コピーを行い、完了後にクラウド専用（空き容量を増やす）に戻す（推奨）
+    /// クラウド専用ファイルをダウンロードして整理する（推奨）
     /// </summary>
-    HydrateAndDehydrate = 0,
+    Download = 0,
 
     /// <summary>
     /// クラウド専用ファイルはスキップする
@@ -16,7 +16,12 @@ public enum CloudFileHandlingMode
     Skip = 1,
 
     /// <summary>
-    /// クラウドからダウンロードしてローカルにも実体を保持する
+    /// 以前のバージョンとの互換性のための別名（Downloadと同等）
     /// </summary>
-    DownloadAndKeep = 2
+    DownloadAndKeep = 0,
+
+    /// <summary>
+    /// 以前のバージョンとの互換性のための別名（Downloadと同等）
+    /// </summary>
+    HydrateAndDehydrate = 0
 }
