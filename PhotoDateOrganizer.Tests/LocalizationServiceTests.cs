@@ -50,6 +50,24 @@ public class LocalizationServiceTests
         Assert.Equal("Start Organizing", strings.StartButton);
     }
 
+    [Theory]
+    [InlineData("ja", AppLanguage.Japanese)]
+    [InlineData("japanese", AppLanguage.Japanese)]
+    [InlineData("Japanese", AppLanguage.Japanese)]
+    [InlineData("en", AppLanguage.English)]
+    [InlineData("english", AppLanguage.English)]
+    [InlineData("English", AppLanguage.English)]
+    [InlineData("auto", AppLanguage.Auto)]
+    [InlineData("Auto", AppLanguage.Auto)]
+    [InlineData("", AppLanguage.Auto)]
+    [InlineData(null, AppLanguage.Auto)]
+    [InlineData("unknown", AppLanguage.Auto)]
+    public void ParseLanguage_ReturnsExpectedAppLanguage(string? input, AppLanguage expected)
+    {
+        var result = LocalizationService.ParseLanguage(input);
+        Assert.Equal(expected, result);
+    }
+
     [Fact]
     public void JapaneseStrings_FormattedMethods_ReturnValidStrings()
     {

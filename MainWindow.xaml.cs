@@ -173,10 +173,7 @@ public sealed partial class MainWindow : Window
         _initialSettings = settings;
 
         // 言語設定の復元
-        if (!string.IsNullOrEmpty(settings.Language) && Enum.TryParse<AppLanguage>(settings.Language, true, out var lang))
-        {
-            LocalizationService.Current.Language = lang;
-        }
+        LocalizationService.Current.Language = LocalizationService.ParseLanguage(settings.Language);
 
         // 免責事項の同意状態を復元
         _isDisclaimerAccepted = settings.IsDisclaimerAccepted;

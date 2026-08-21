@@ -442,6 +442,23 @@ public sealed class LocalizationService : INotifyPropertyChanged
         return new EnglishStrings();
     }
 
+    /// <summary>
+    /// 文字列（"ja", "en", "auto", "japanese", "english" 等）から AppLanguage を安全に解析します。
+    /// </summary>
+    public static AppLanguage ParseLanguage(string? langStr)
+    {
+        if (string.IsNullOrWhiteSpace(langStr)) return AppLanguage.Auto;
+
+        var normalized = langStr.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "en" or "english" => AppLanguage.English,
+            "ja" or "japanese" => AppLanguage.Japanese,
+            "auto" => AppLanguage.Auto,
+            _ => Enum.TryParse<AppLanguage>(langStr, true, out var lang) ? lang : AppLanguage.Auto
+        };
+    }
+
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
