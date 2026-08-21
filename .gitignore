@@ -8,3 +8,5 @@ obj/
 .vscode/
 TestResults/
 *.binlog
+Installer/
+MSIX/

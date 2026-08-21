@@ -1,4 +1,4 @@
-﻿namespace PhotoDateOrganizer.Models;
+namespace PhotoDateOrganizer.Models;
 
 public class AppSettings
 {
@@ -8,6 +8,11 @@ public class AppSettings
     public int WindowY { get; set; } = -1;
     public int WindowWidth { get; set; } = 1100;
     public int WindowHeight { get; set; } = 750;
+
+    /// <summary>
+    /// 初回起動時の免責事項（注意事項・無保証等）に同意済みかどうか
+    /// </summary>
+    public bool IsDisclaimerAccepted { get; set; } = false;
 
     /// <summary>
     /// OneDriveやSharePointなどのオンライン専用（未ダウンロード）ファイルの処理モード

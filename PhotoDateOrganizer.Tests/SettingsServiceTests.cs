@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using PhotoDateOrganizer.Models;
 using PhotoDateOrganizer.Services;
@@ -45,7 +45,8 @@ public class SettingsServiceTests : IDisposable
             WindowY = 200,
             WindowWidth = 1280,
             WindowHeight = 800,
-            CloudFileMode = CloudFileHandlingMode.Download
+            CloudFileMode = CloudFileHandlingMode.Download,
+            IsDisclaimerAccepted = true
         };
 
         // Act
@@ -62,6 +63,7 @@ public class SettingsServiceTests : IDisposable
         Assert.Equal(originalSettings.WindowHeight, importedSettings.WindowHeight);
         Assert.Equal(originalSettings.CloudFileMode, importedSettings.CloudFileMode);
         Assert.Equal(originalSettings.SkipCloudOnlyFiles, importedSettings.SkipCloudOnlyFiles);
+        Assert.Equal(originalSettings.IsDisclaimerAccepted, importedSettings.IsDisclaimerAccepted);
     }
 
     [Fact]
