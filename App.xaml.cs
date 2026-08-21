@@ -4,7 +4,7 @@ namespace PhotoDateOrganizer;
 
 public partial class App : Application
 {
-    private Window? _mainWindow;
+    private MainWindow? _mainWindow;
 
     public App()
     {
@@ -15,5 +15,6 @@ public partial class App : Application
     {
         _mainWindow = new MainWindow();
         _mainWindow.Activate();
+        _mainWindow.RestoreWindowPlacement();
     }
 }

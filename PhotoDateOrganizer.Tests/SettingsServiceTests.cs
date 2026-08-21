@@ -46,6 +46,8 @@ public class SettingsServiceTests : IDisposable
             WindowWidth = 1280,
             WindowHeight = 800,
             CloudFileMode = CloudFileHandlingMode.Download,
+            Language = "ja",
+            IsMaximized = true,
             IsDisclaimerAccepted = true
         };
 
@@ -63,6 +65,8 @@ public class SettingsServiceTests : IDisposable
         Assert.Equal(originalSettings.WindowHeight, importedSettings.WindowHeight);
         Assert.Equal(originalSettings.CloudFileMode, importedSettings.CloudFileMode);
         Assert.Equal(originalSettings.SkipCloudOnlyFiles, importedSettings.SkipCloudOnlyFiles);
+        Assert.Equal(originalSettings.Language, importedSettings.Language);
+        Assert.Equal(originalSettings.IsMaximized, importedSettings.IsMaximized);
         Assert.Equal(originalSettings.IsDisclaimerAccepted, importedSettings.IsDisclaimerAccepted);
     }
 

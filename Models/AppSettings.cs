@@ -10,6 +10,11 @@ public class AppSettings
     public int WindowHeight { get; set; } = 750;
 
     /// <summary>
+    /// ウィンドウが最大化状態だったかどうか
+    /// </summary>
+    public bool IsMaximized { get; set; } = false;
+
+    /// <summary>
     /// 初回起動時の免責事項（注意事項・無保証等）に同意済みかどうか
     /// </summary>
     public bool IsDisclaimerAccepted { get; set; } = false;
@@ -18,6 +23,11 @@ public class AppSettings
     /// OneDriveやSharePointなどのオンライン専用（未ダウンロード）ファイルの処理モード
     /// </summary>
     public CloudFileHandlingMode CloudFileMode { get; set; } = CloudFileHandlingMode.Download;
+
+    /// <summary>
+    /// 表示言語設定 ("auto", "ja", "en")
+    /// </summary>
+    public string Language { get; set; } = "auto";
 
     /// <summary>
     /// 以前のバージョンとの互換性のためのフラグ（CloudFileModeと連動）

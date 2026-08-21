@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -16,6 +17,41 @@ namespace PhotoDateOrganizer;
 
 public sealed partial class MainWindow : Window
 {
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public int dwFlags;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromRect([In] ref RECT lprc, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    private const uint SWP_NOZORDER = 0x0004;
+    private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_SHOWWINDOW = 0x0040;
+    private const uint MONITOR_DEFAULTTONEAREST = 2;
+
     public MainViewModel ViewModel { get; }
     private readonly SettingsService _settingsService = new();
 
@@ -25,9 +61,13 @@ public sealed partial class MainWindow : Window
     private int _savedWindowWidth = 1100;
     private int _savedWindowHeight = 750;
     private bool _isDisclaimerAccepted = false;
+    private bool _isInitializing = true;
+    private bool _hasAppliedInitialPosition = false;
+    private AppSettings? _initialSettings;
 
     public MainWindow()
     {
+        _isInitializing = true;
         this.InitializeComponent();
 
         // Mica バックドロップを適用（サポート環境のみ）
@@ -40,15 +80,15 @@ public sealed partial class MainWindow : Window
             // 未サポート環境ではデフォルト背景を使用
         }
 
-        // ViewModel の初期化とイベント購読
+        // ViewModel の初期化
         ViewModel = new MainViewModel();
         ViewModel.RequestFolderPickerAsync += PickFolderAsync;
         ViewModel.RequestImportFilePickerAsync += PickImportFileAsync;
         ViewModel.RequestExportFilePickerAsync += PickExportFileAsync;
-        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         // アプリバージョンを含むウィンドウタイトルを設定
-        this.Title = $"PhotoDateOrganizer {ViewModel.AppVersionDisplay} - 写真・動画撮影日時自動整理";
+        UpdateTitle();
+        LocalizationService.Current.PropertyChanged += (_, _) => UpdateTitle();
 
         // ウィンドウアイコンの設定
         try
@@ -67,6 +107,12 @@ public sealed partial class MainWindow : Window
         // 設定の復元（ウィンドウ位置・サイズ・設定値）
         RestoreSettings();
 
+        // ウィンドウアクティブ化時の位置復元フック（WinUI 3の初期Activateによるプライマリモニタへのリセットを防止）
+        this.Activated += OnWindowActivated;
+
+        // 設定復元完了後に ViewModel のプロパティ変更を監視開始
+        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+
         // 初回起動時の免責事項同意確認
         if (this.Content is FrameworkElement rootElement)
         {
@@ -84,43 +130,59 @@ public sealed partial class MainWindow : Window
         this.AppWindow.Closing += OnAppWindowClosing;
     }
 
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (!_hasAppliedInitialPosition && _initialSettings != null)
+        {
+            _hasAppliedInitialPosition = true;
+            RestoreWindowPositionAndSize(_initialSettings);
+
+            // 表示・アクティブ化に伴う初期レイアウトイベントが完了した後に初期化フラグを解除
+            this.DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                _isInitializing = false;
+            });
+        }
+    }
+
+    /// <summary>
+    /// ウィンドウのアクティブ化完了後に外部（App.xaml.cs）から呼び出され、確実にマルチモニタ位置へ復元します。
+    /// </summary>
+    public void RestoreWindowPlacement()
+    {
+        var settings = _settingsService.LoadSettings();
+        RestoreWindowPositionAndSize(settings);
+
+        this.DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            _isInitializing = false;
+        });
+    }
+
+    private void UpdateTitle()
+    {
+        this.Title = $"PhotoDateOrganizer {ViewModel.AppVersionDisplay} - {(LocalizationService.Current.IsJapanese ? "写真・動画撮影日時自動整理" : "Auto Organize Photos & Videos by Date")}";
+    }
+
     /// <summary>
     /// 設定ファイルからウィンドウサイズ・位置および各種オプションを復元します。
     /// </summary>
     private void RestoreSettings()
     {
         var settings = _settingsService.LoadSettings();
+        _initialSettings = settings;
+
+        // 言語設定の復元
+        if (!string.IsNullOrEmpty(settings.Language) && Enum.TryParse<AppLanguage>(settings.Language, true, out var lang))
+        {
+            LocalizationService.Current.Language = lang;
+        }
 
         // 免責事項の同意状態を復元
         _isDisclaimerAccepted = settings.IsDisclaimerAccepted;
 
-        // ウィンドウサイズ復元（最小サイズ 800x600 を担保）
-        int width = Math.Max(settings.WindowWidth, 800);
-        int height = Math.Max(settings.WindowHeight, 600);
-        _savedWindowWidth = width;
-        _savedWindowHeight = height;
-        this.AppWindow.Resize(new SizeInt32(width, height));
-
-        // ウィンドウ位置復元（ディスプレイ作業領域内に収まるようクランプ補正）
-        if (settings.WindowX > -10000 && settings.WindowY > -10000 && (settings.WindowX != -1 || settings.WindowY != -1))
-        {
-            _savedWindowX = settings.WindowX;
-            _savedWindowY = settings.WindowY;
-
-            // ディスプレイ領域を取得して画面外にはみ出さないよう補正
-            var displayArea = DisplayArea.GetFromPoint(new PointInt32(settings.WindowX, settings.WindowY), DisplayAreaFallback.Nearest);
-            if (displayArea != null)
-            {
-                var workArea = displayArea.WorkArea;
-                int clampedX = Math.Max(workArea.X, Math.Min(settings.WindowX, workArea.X + Math.Max(0, workArea.Width - 100)));
-                int clampedY = Math.Max(workArea.Y, Math.Min(settings.WindowY, workArea.Y + Math.Max(0, workArea.Height - 100)));
-                this.AppWindow.Move(new PointInt32(clampedX, clampedY));
-            }
-            else
-            {
-                this.AppWindow.Move(new PointInt32(settings.WindowX, settings.WindowY));
-            }
-        }
+        // マルチモニタ対応のウィンドウ位置・サイズ復元
+        RestoreWindowPositionAndSize(settings);
 
         // フォルダパスおよび設定オプションの復元
         if (!string.IsNullOrEmpty(settings.SourceDirectory))
@@ -137,6 +199,81 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
+    /// マルチモニタ環境を考慮して保存されたウィンドウ位置とサイズを復元します。
+    /// </summary>
+    private void RestoreWindowPositionAndSize(AppSettings settings)
+    {
+        int width = Math.Max(settings.WindowWidth, 800);
+        int height = Math.Max(settings.WindowHeight, 600);
+        _savedWindowWidth = width;
+        _savedWindowHeight = height;
+
+        var hwnd = WindowNative.GetWindowHandle(this);
+        if (hwnd == IntPtr.Zero) return;
+
+        if (settings.WindowX <= -10000 || settings.WindowY <= -10000 || (settings.WindowX == -1 && settings.WindowY == -1))
+        {
+            this.AppWindow.Resize(new SizeInt32(width, height));
+            return;
+        }
+
+        int savedX = settings.WindowX;
+        int savedY = settings.WindowY;
+
+        // Win32 MonitorFromRect を用いてターゲットモニタを判定（マルチモニタ対応）
+        var targetRect = new RECT
+        {
+            Left = savedX,
+            Top = savedY,
+            Right = savedX + width,
+            Bottom = savedY + height
+        };
+
+        var hMonitor = MonitorFromRect(ref targetRect, MONITOR_DEFAULTTONEAREST);
+        if (hMonitor != IntPtr.Zero)
+        {
+            var mi = new MONITORINFO();
+            mi.cbSize = Marshal.SizeOf<MONITORINFO>();
+
+            if (GetMonitorInfo(hMonitor, ref mi))
+            {
+                int workWidth = mi.rcWork.Right - mi.rcWork.Left;
+                int workHeight = mi.rcWork.Bottom - mi.rcWork.Top;
+
+                int targetWidth = Math.Min(width, workWidth);
+                int targetHeight = Math.Min(height, workHeight);
+
+                // 操作バーが消えないよう作業領域内に確実にクランプ
+                int clampedX = Math.Max(mi.rcWork.Left, Math.Min(savedX, mi.rcWork.Right - 100));
+                int clampedY = Math.Max(mi.rcWork.Top, Math.Min(savedY, mi.rcWork.Bottom - 100));
+
+                _savedWindowX = clampedX;
+                _savedWindowY = clampedY;
+                _savedWindowWidth = targetWidth;
+                _savedWindowHeight = targetHeight;
+
+                SetWindowPos(hwnd, IntPtr.Zero, clampedX, clampedY, targetWidth, targetHeight, SWP_NOZORDER | SWP_SHOWWINDOW);
+                this.AppWindow.MoveAndResize(new RectInt32(clampedX, clampedY, targetWidth, targetHeight));
+
+                if (settings.IsMaximized && this.AppWindow.Presenter is OverlappedPresenter presenter)
+                {
+                    presenter.Maximize();
+                }
+                return;
+            }
+        }
+
+        // フォールバック: 直接指定
+        SetWindowPos(hwnd, IntPtr.Zero, savedX, savedY, width, height, SWP_NOZORDER | SWP_SHOWWINDOW);
+        this.AppWindow.MoveAndResize(new RectInt32(savedX, savedY, width, height));
+
+        if (settings.IsMaximized && this.AppWindow.Presenter is OverlappedPresenter fallbackPresenter)
+        {
+            fallbackPresenter.Maximize();
+        }
+    }
+
+    /// <summary>
     /// 初回起動時に免責事項ダイアログを表示し、ユーザーの同意を確認します。
     /// 同意されない場合はアプリケーションを安全に終了します。
     /// </summary>
@@ -147,11 +284,13 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        var strings = LocalizationService.Current.Strings;
+
         var dialog = new ContentDialog
         {
-            Title = "⚠️ ご利用上の注意事項・免責事項 (Disclaimer)",
-            PrimaryButtonText = "同意して利用を開始する",
-            CloseButtonText = "同意しない (終了)",
+            Title = strings.DisclaimerDialogTitle,
+            PrimaryButtonText = strings.DisclaimerAgreeButton,
+            CloseButtonText = strings.DisclaimerDisagreeButton,
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = this.Content.XamlRoot
         };
@@ -193,7 +332,7 @@ public sealed partial class MainWindow : Window
 
         var cautionText = new TextBlock
         {
-            Text = "本ソフトウェアをご利用いただく前に、以下の注意事項および免責事項を必ずご確認ください。",
+            Text = strings.DisclaimerCautionBanner,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             TextWrapping = TextWrapping.Wrap,
             VerticalAlignment = VerticalAlignment.Center
@@ -211,28 +350,28 @@ public sealed partial class MainWindow : Window
         };
 
         itemsStack.Children.Add(CreateDisclaimerItem(
-            "1. 原本ファイルの保持とユーザーによる整理・削除の注意",
-            "本アプリは写真・動画ファイルを日付フォルダへ「コピー」するツールであり、整理元（原本）のファイルを削除・移動・変更する処理は一切行いません。ただし、本アプリによる整理完了後にユーザー自身が原本ファイルを整理・削除する際の誤削除等には十分にご注意ください。"));
+            strings.DisclaimerItem1Title,
+            strings.DisclaimerItem1Desc));
 
         itemsStack.Children.Add(CreateDisclaimerItem(
-            "2. 無保証 (AS-IS)",
-            "本ソフトウェアは現状有姿（AS-IS）で提供され、明示的・黙示的を問わず、その正確性、完全性、特定目的への適合性についていかなる保証も行いません。"));
+            strings.DisclaimerItem2Title,
+            strings.DisclaimerItem2Desc));
 
         itemsStack.Children.Add(CreateDisclaimerItem(
-            "3. 事前テストの実施",
-            "重要な本番データや大容量フォルダに適用する前に、必ず影響のないテスト用フォルダを作成し、ファイルコピーおよび日時分類の動作を十分に検証した上でご利用ください。"));
+            strings.DisclaimerItem3Title,
+            strings.DisclaimerItem3Desc));
 
         itemsStack.Children.Add(CreateDisclaimerItem(
-            "4. メタデータおよび撮影日時の判定について",
-            "Exif や QuickTime などのメタデータが存在しない場合や破損している場合は、ファイルシステムのタイムスタンプ（作成日時等）が代用されます。SNS保存画像や編集済み動画等では正確な撮影日時とならない場合があります。"));
+            strings.DisclaimerItem4Title,
+            strings.DisclaimerItem4Desc));
 
         itemsStack.Children.Add(CreateDisclaimerItem(
-            "5. クラウド専用ファイル（OneDrive等）と通信環境に関する注意",
-            "OneDrive や SharePoint などのオンライン専用（未ダウンロード）ファイルを処理対象とする場合、ネットワーク経由での自動ダウンロードが発生します。通信量や従量制課金環境にご注意ください（設定によりスキップすることも可能です）。"));
+            strings.DisclaimerItem5Title,
+            strings.DisclaimerItem5Desc));
 
         itemsStack.Children.Add(CreateDisclaimerItem(
-            "6. 免責事項 (開発者の責任について)",
-            "本ソフトウェアの使用、設定の誤り、ネットワーク障害、ファイルコピーやメタデータ解析処理等により生じたいかなる損害（データの消失、破損、業務の中断、利益の損失等を含むがこれらに限定されない）について、開発者は一切の責任を負いません。バックアップ等の安全対策は利用者自身の責任で行ってください。"));
+            strings.DisclaimerItem6Title,
+            strings.DisclaimerItem6Desc));
 
         var scrollViewer = new ScrollViewer
         {
@@ -288,24 +427,47 @@ public sealed partial class MainWindow : Window
     /// <summary>
     /// ウィンドウの位置やサイズ変更時に通常表示（Restored）状態の値のみを記憶します。
     /// </summary>
-    private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    private void UpdateSavedWindowBounds()
     {
-        if (args.DidPositionChange || args.DidSizeChange || args.DidPresenterChange)
+        if (_isInitializing) return;
+
+        var hwnd = WindowNative.GetWindowHandle(this);
+        if (hwnd != IntPtr.Zero && GetWindowRect(hwnd, out RECT rect))
         {
-            if (this.AppWindow.Presenter is OverlappedPresenter presenter &&
+            if (this.AppWindow?.Presenter is OverlappedPresenter presenter &&
                 presenter.State == OverlappedPresenterState.Restored)
             {
-                var pos = this.AppWindow.Position;
-                var size = this.AppWindow.Size;
+                int width = rect.Right - rect.Left;
+                int height = rect.Bottom - rect.Top;
 
-                // 最小化時の特殊座標（-32000等）を除外し、有効な値のみを更新
-                if (pos.X > -10000 && pos.Y > -10000 && size.Width >= 400 && size.Height >= 300)
+                // 最小化時の特殊座標（-32000等）を除外し、有効な実座標のみを更新
+                if (rect.Left > -10000 && rect.Top > -10000 && width >= 400 && height >= 300)
                 {
-                    _savedWindowX = pos.X;
-                    _savedWindowY = pos.Y;
-                    _savedWindowWidth = size.Width;
-                    _savedWindowHeight = size.Height;
+                    _savedWindowX = rect.Left;
+                    _savedWindowY = rect.Top;
+                    _savedWindowWidth = width;
+                    _savedWindowHeight = height;
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// ウィンドウの位置やサイズ変更時に通常表示（Restored）状態の値のみを記憶します。
+    /// </summary>
+    private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (_isInitializing) return;
+
+        if (args.DidPositionChange || args.DidSizeChange || args.DidPresenterChange)
+        {
+            try
+            {
+                UpdateSavedWindowBounds();
+            }
+            catch
+            {
+                // ウィンドウ破棄中などの例外は無視
             }
         }
     }
@@ -315,31 +477,35 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void SaveCurrentSettings()
     {
+        if (_isInitializing) return;
+
+        bool isMaximized = false;
         try
         {
-            if (this.AppWindow?.Presenter is OverlappedPresenter presenter &&
-                presenter.State == OverlappedPresenterState.Restored)
+            if (this.AppWindow?.Presenter is OverlappedPresenter presenter)
             {
-                var pos = this.AppWindow.Position;
-                var size = this.AppWindow.Size;
-                if (pos.X > -10000 && pos.Y > -10000 && size.Width >= 400 && size.Height >= 300)
-                {
-                    _savedWindowX = pos.X;
-                    _savedWindowY = pos.Y;
-                    _savedWindowWidth = size.Width;
-                    _savedWindowHeight = size.Height;
-                }
+                isMaximized = presenter.State == OverlappedPresenterState.Maximized;
             }
+            UpdateSavedWindowBounds();
+        }
+        catch
+        {
+            // 終了時などのCOMアクセス例外は無視し、キャッシュ値を使用
+        }
 
+        try
+        {
             var settings = new AppSettings
             {
                 WindowX = _savedWindowX,
                 WindowY = _savedWindowY,
                 WindowWidth = _savedWindowWidth,
                 WindowHeight = _savedWindowHeight,
-                SourceDirectory = ViewModel.SourceDirectory ?? string.Empty,
-                DestinationDirectory = ViewModel.DestinationDirectory ?? string.Empty,
-                CloudFileMode = ViewModel.CloudFileMode,
+                IsMaximized = isMaximized,
+                SourceDirectory = ViewModel?.SourceDirectory ?? string.Empty,
+                DestinationDirectory = ViewModel?.DestinationDirectory ?? string.Empty,
+                CloudFileMode = ViewModel?.CloudFileMode ?? CloudFileHandlingMode.Download,
+                Language = LocalizationService.Current.Language.ToString().ToLowerInvariant(),
                 IsDisclaimerAccepted = _isDisclaimerAccepted
             };
 
@@ -425,7 +591,7 @@ public sealed partial class MainWindow : Window
         InitializeWithWindow.Initialize(savePicker, hwnd);
 
         savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-        savePicker.FileTypeChoices.Add("JSON ファイル (*.json)", new[] { ".json" });
+        savePicker.FileTypeChoices.Add(LocalizationService.Current.Strings.JsonFilePickerFilterName, new[] { ".json" });
         savePicker.SuggestedFileName = "PhotoDateOrganizer_settings.json";
 
         var file = await savePicker.PickSaveFileAsync();

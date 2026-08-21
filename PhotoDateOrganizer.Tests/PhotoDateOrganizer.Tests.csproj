@@ -22,6 +22,7 @@
     <Compile Include="..\Models\OrganizeResult.cs" Link="Models\OrganizeResult.cs" />
     <Compile Include="..\Services\IPhotoOrganizerService.cs" Link="Services\IPhotoOrganizerService.cs" />
     <Compile Include="..\Services\CloudFileService.cs" Link="Services\CloudFileService.cs" />
+    <Compile Include="..\Services\LocalizationService.cs" Link="Services\LocalizationService.cs" />
     <Compile Include="..\Services\PhotoOrganizerService.cs" Link="Services\PhotoOrganizerService.cs" />
     <Compile Include="..\Services\SettingsService.cs" Link="Services\SettingsService.cs" />
   </ItemGroup>

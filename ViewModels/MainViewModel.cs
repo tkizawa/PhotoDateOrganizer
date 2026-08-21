@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -18,6 +18,8 @@ public partial class MainViewModel : ObservableObject
 
     public string AppVersion => typeof(MainViewModel).Assembly.GetName().Version?.ToString() ?? "1.0.0.0";
     public string AppVersionDisplay => $"v{AppVersion}";
+
+    public AppStrings Strings => LocalizationService.Current.Strings;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(StartOrganizingCommand))]
@@ -99,7 +101,7 @@ public partial class MainViewModel : ObservableObject
     private string _currentFile = string.Empty;
 
     [ObservableProperty]
-    private string _statusMessage = "準備完了: ソースフォルダと出力先フォルダを選択してください。";
+    private string _statusMessage = LocalizationService.Current.Strings.ReadyStatus;
 
     [ObservableProperty]
     private int _totalFiles;
@@ -134,6 +136,10 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel(IPhotoOrganizerService organizerService)
     {
         _organizerService = organizerService;
+        LocalizationService.Current.PropertyChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(Strings));
+        };
     }
 
     public MainViewModel() : this(new PhotoOrganizerService())
@@ -157,7 +163,7 @@ public partial class MainViewModel : ObservableObject
             if (!string.IsNullOrEmpty(folder))
             {
                 SourceDirectory = folder;
-                AddLog(LogLevel.Info, $"ソースフォルダを設定: {folder}");
+                AddLog(LogLevel.Info, Strings.SourceFolderSetFormat(folder));
             }
         }
     }
@@ -171,7 +177,7 @@ public partial class MainViewModel : ObservableObject
             if (!string.IsNullOrEmpty(folder))
             {
                 DestinationDirectory = folder;
-                AddLog(LogLevel.Info, $"出力先フォルダを設定: {folder}");
+                AddLog(LogLevel.Info, Strings.DestinationFolderSetFormat(folder));
             }
         }
     }
@@ -181,7 +187,7 @@ public partial class MainViewModel : ObservableObject
     {
         if (!Directory.Exists(SourceDirectory))
         {
-            AddLog(LogLevel.Error, "エラー: ソースフォルダが存在しません。");
+            AddLog(LogLevel.Error, Strings.SourceFolderNotFound);
             return;
         }
 
@@ -206,7 +212,7 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            AddLog(LogLevel.Info, $"整理処理を開始します...");
+            AddLog(LogLevel.Info, Strings.StartOrganizingProcess);
             var sourceDir = SourceDirectory;
             var destDir = DestinationDirectory;
             var cloudMode = CloudFileMode;
@@ -223,34 +229,34 @@ public partial class MainViewModel : ObservableObject
 
             if (result.IsCancelled)
             {
-                StatusMessage = "処理がキャンセルされました。";
+                StatusMessage = Strings.OperationCancelled;
             }
             else if (!string.IsNullOrEmpty(result.ErrorMessage))
             {
-                StatusMessage = $"エラー: {result.ErrorMessage}";
+                StatusMessage = Strings.ErrorFormat(result.ErrorMessage);
             }
             else
             {
                 if (result.FallbackCount > 0)
                 {
                     HasFallbackFiles = true;
-                    FallbackNoticeMessage = $"💡 注意: {result.FallbackCount} 件のファイルはExifメタデータが無いため、ファイル名またはタイムスタンプから判定しました。";
-                    StatusMessage = $"整理完了: {result.CopiedCount} 件コピー (うち {result.FallbackCount} 件はExif欠損), {result.SkippedCount} 件スキップ ({result.Duration:mm\\:ss})";
+                    FallbackNoticeMessage = Strings.FallbackNoticeFormat(result.FallbackCount);
+                    StatusMessage = Strings.OrganizeCompleteWithFallbackFormat(result.CopiedCount, result.FallbackCount, result.SkippedCount, result.Duration);
                 }
                 else
                 {
-                    StatusMessage = $"整理完了: {result.CopiedCount} 件コピー, {result.SkippedCount} 件スキップ, {result.ErrorCount} 件エラー ({result.Duration:mm\\:ss})";
+                    StatusMessage = Strings.OrganizeCompleteStandardFormat(result.CopiedCount, result.SkippedCount, result.ErrorCount, result.Duration);
                 }
             }
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = "処理がキャンセルされました。";
+            StatusMessage = Strings.OperationCancelled;
         }
         catch (Exception ex)
         {
-            StatusMessage = $"エラーが発生しました: {ex.Message}";
-            AddLog(LogLevel.Error, $"例外エラー: {ex.Message}");
+            StatusMessage = Strings.ErrorFormat(ex.Message);
+            AddLog(LogLevel.Error, Strings.ExceptionErrorFormat(ex.Message));
         }
         finally
         {
@@ -266,8 +272,8 @@ public partial class MainViewModel : ObservableObject
     {
         if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
         {
-            StatusMessage = "キャンセルを要求中...";
-            AddLog(LogLevel.Warning, "ユーザーによるキャンセルが要求されました。");
+            StatusMessage = Strings.RequestingCancellation;
+            AddLog(LogLevel.Warning, Strings.CancellationRequestedByUser);
             _cancellationTokenSource.Cancel();
         }
     }
@@ -293,7 +299,7 @@ public partial class MainViewModel : ObservableObject
             }
             catch (Exception ex)
             {
-                AddLog(LogLevel.Error, $"フォルダを開けませんでした: {ex.Message}");
+                AddLog(LogLevel.Error, Strings.CannotOpenFolderFormat(ex.Message));
             }
         }
     }
@@ -321,13 +327,13 @@ public partial class MainViewModel : ObservableObject
             }
             SkipCloudOnlyFiles = settings.SkipCloudOnlyFiles;
 
-            AddLog(LogLevel.Info, $"設定をインポートしました: {filePath}");
-            StatusMessage = $"設定をインポートしました ({Path.GetFileName(filePath)})";
+            AddLog(LogLevel.Info, Strings.SettingsImportedFormat(filePath));
+            StatusMessage = Strings.SettingsImportedSummaryFormat(Path.GetFileName(filePath));
         }
         catch (Exception ex)
         {
-            AddLog(LogLevel.Error, $"設定のインポートに失敗しました: {ex.Message}");
-            StatusMessage = $"設定インポートエラー: {ex.Message}";
+            AddLog(LogLevel.Error, Strings.SettingsImportFailedFormat(ex.Message));
+            StatusMessage = Strings.ErrorFormat(ex.Message);
         }
     }
 
@@ -349,13 +355,13 @@ public partial class MainViewModel : ObservableObject
 
             settingsService.ExportSettings(filePath, currentSettings);
 
-            AddLog(LogLevel.Info, $"設定をエクスポートしました: {filePath}");
-            StatusMessage = $"設定をエクスポートしました ({Path.GetFileName(filePath)})";
+            AddLog(LogLevel.Info, Strings.SettingsExportedFormat(filePath));
+            StatusMessage = Strings.SettingsExportedSummaryFormat(Path.GetFileName(filePath));
         }
         catch (Exception ex)
         {
-            AddLog(LogLevel.Error, $"設定のエクスポートに失敗しました: {ex.Message}");
-            StatusMessage = $"設定エクスポートエラー: {ex.Message}";
+            AddLog(LogLevel.Error, Strings.SettingsExportFailedFormat(ex.Message));
+            StatusMessage = Strings.ErrorFormat(ex.Message);
         }
     }
 
@@ -388,7 +394,7 @@ public partial class MainViewModel : ObservableObject
         if (p.FallbackCount > 0)
         {
             HasFallbackFiles = true;
-            FallbackNoticeMessage = $"💡 注意: {p.FallbackCount} 件のファイルはExif欠損のため、ファイル名またはタイムスタンプから判定中です。";
+            FallbackNoticeMessage = Strings.FallbackNoticeProgressFormat(p.FallbackCount);
         }
 
         if (!string.IsNullOrEmpty(p.CurrentFilePath))

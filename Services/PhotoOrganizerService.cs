@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -167,11 +167,13 @@ public class PhotoOrganizerService : IPhotoOrganizerService
         int errorCount = 0;
         int fallbackCount = 0;
 
+        var strings = LocalizationService.Current.Strings;
+
         try
         {
             if (!System.IO.Directory.Exists(sourceDirectory))
             {
-                throw new DirectoryNotFoundException($"ソースフォルダが見つかりません: {sourceDirectory}");
+                throw new DirectoryNotFoundException($"{strings.SourceFolderNotFound}: {sourceDirectory}");
             }
 
             if (!System.IO.Directory.Exists(destinationDirectory))
@@ -183,11 +185,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
             progress.Report(new OrganizeProgress
             {
                 Phase = OrganizePhase.Scanning,
-                StatusMessage = "ファイルをスキャン中...",
+                StatusMessage = strings.ScanningFilesStatus,
                 NewLogEntry = new LogEntry
                 {
                     Level = LogLevel.Info,
-                    Message = $"スキャン開始: {sourceDirectory}"
+                    Message = strings.ScanningStartLog(sourceDirectory)
                 }
             });
 
@@ -205,11 +207,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 Phase = OrganizePhase.Organizing,
                 TotalCount = totalFiles,
                 ProcessedCount = 0,
-                StatusMessage = $"スキャン完了: {totalFiles} 件の対象ファイルが見つかりました",
+                StatusMessage = strings.ScanCompletedStatus(totalFiles),
                 NewLogEntry = new LogEntry
                 {
                     Level = LogLevel.Info,
-                    Message = $"{totalFiles} 件の対象写真・動画ファイルを検出しました。"
+                    Message = strings.ScanDetectedLog(totalFiles)
                 }
             });
 
@@ -258,11 +260,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                                 ErrorCount = errorCount,
                                 FallbackCount = fallbackCount,
                                 CurrentFilePath = sourceFile,
-                                StatusMessage = $"スキップ: {fileName}（OneDrive/クラウド専用ファイル）",
+                                StatusMessage = strings.SkipCloudOnlyStatus(fileName),
                                 NewLogEntry = new LogEntry
                                 {
                                     Level = LogLevel.Warning,
-                                    Message = $"[スキップ] クラウド専用ファイルのためスキップしました（ローカルに未ダウンロード）: {fileName}",
+                                    Message = strings.SkipCloudOnlyLog(fileName),
                                     FilePath = sourceFile
                                 }
                             });
@@ -280,11 +282,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                             ErrorCount = errorCount,
                             FallbackCount = fallbackCount,
                             CurrentFilePath = sourceFile,
-                            StatusMessage = $"ダウンロード中: {fileName} (クラウドから取得中...)",
+                            StatusMessage = strings.DownloadingCloudFileStatus(fileName),
                             NewLogEntry = new LogEntry
                             {
                                 Level = LogLevel.Info,
-                                Message = $"[ダウンロード中] クラウド専用ファイルを一時ダウンロードしています: {fileName}",
+                                Message = strings.DownloadingCloudFileLog(fileName),
                                 FilePath = sourceFile
                             }
                         });
@@ -303,11 +305,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                                 ErrorCount = errorCount,
                                 FallbackCount = fallbackCount,
                                 CurrentFilePath = sourceFile,
-                                StatusMessage = $"エラー: {fileName} (ダウンロード失敗)",
+                                StatusMessage = strings.DownloadCloudFileFailedStatus(fileName),
                                 NewLogEntry = new LogEntry
                                 {
                                     Level = LogLevel.Error,
-                                    Message = $"[エラー] {fileName}: クラウドからのダウンロードに失敗しました。",
+                                    Message = strings.DownloadCloudFileFailedLog(fileName),
                                     FilePath = sourceFile
                                 }
                             });
@@ -358,11 +360,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                             ErrorCount = errorCount,
                             FallbackCount = fallbackCount,
                             CurrentFilePath = sourceFile,
-                            StatusMessage = $"スキップ: {fileName}（同一ファイルが既に存在）",
+                            StatusMessage = strings.SkipDuplicateStatus(fileName),
                             NewLogEntry = new LogEntry
                             {
                                 Level = LogLevel.Warning,
-                                Message = $"[スキップ] 同一ファイルが既に存在します: {fileName} -> {Path.GetRelativePath(destinationDirectory, targetFilePath)}",
+                                Message = strings.SkipDuplicateLog(fileName, Path.GetRelativePath(destinationDirectory, targetFilePath)),
                                 FilePath = sourceFile
                             }
                         });
@@ -375,11 +377,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
 
                         var (logLevel, note) = dateSource switch
                         {
-                            DateSourceType.Exif => (LogLevel.Success, $" (Exif: {captureDate:yyyy-MM-dd HH:mm:ss})"),
-                            DateSourceType.QuickTime => (LogLevel.Success, $" (動画メタデータ: {captureDate:yyyy-MM-dd HH:mm:ss})"),
-                            DateSourceType.FilenamePattern => (LogLevel.Warning, $" (💡 Exif欠損: ファイル名から「{captureDate:yyyy-MM-dd}」を推定)"),
-                            DateSourceType.FileModifiedTime => (LogLevel.Warning, $" (⚠ Exif欠損: ファイル更新日時 {captureDate:yyyy-MM-dd} を使用)"),
-                            _ => (LogLevel.Warning, $" (⚠ Exif欠損: ファイル作成日時 {captureDate:yyyy-MM-dd} を使用)")
+                            DateSourceType.Exif => (LogLevel.Success, strings.NoteExif(captureDate)),
+                            DateSourceType.QuickTime => (LogLevel.Success, strings.NoteQuickTime(captureDate)),
+                            DateSourceType.FilenamePattern => (LogLevel.Warning, strings.NoteFilenamePattern(captureDate)),
+                            DateSourceType.FileModifiedTime => (LogLevel.Warning, strings.NoteFileModified(captureDate)),
+                            _ => (LogLevel.Warning, strings.NoteFileCreated(captureDate))
                         };
 
                         progress.Report(new OrganizeProgress
@@ -392,11 +394,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                             ErrorCount = errorCount,
                             FallbackCount = fallbackCount,
                             CurrentFilePath = sourceFile,
-                            StatusMessage = $"コピー完了: {fileName}",
+                            StatusMessage = strings.CopyCompleteStatus(fileName),
                             NewLogEntry = new LogEntry
                             {
                                 Level = logLevel,
-                                Message = $"[コピー] {fileName} -> {Path.GetRelativePath(destinationDirectory, targetFilePath)}{note}",
+                                Message = strings.CopyLog(fileName, Path.GetRelativePath(destinationDirectory, targetFilePath), note),
                                 FilePath = sourceFile
                             }
                         });
@@ -410,8 +412,8 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 {
                     errorCount++;
                     string errorMsg = IsCloudFileException(ex)
-                        ? $"[エラー] {fileName}: OneDrive/クラウド専用ファイルへのアクセスに失敗しました。ローカルにダウンロードされていないか、同期が停止している可能性があります。"
-                        : $"[エラー] {fileName}: {ex.Message}";
+                        ? strings.ErrorCloudAccessLog(fileName)
+                        : strings.ErrorGeneralLog(fileName, ex.Message);
 
                     progress.Report(new OrganizeProgress
                     {
@@ -423,7 +425,7 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                         ErrorCount = errorCount,
                         FallbackCount = fallbackCount,
                         CurrentFilePath = sourceFile,
-                        StatusMessage = $"エラー: {fileName}",
+                        StatusMessage = strings.ErrorFormat(fileName),
                         NewLogEntry = new LogEntry
                         {
                             Level = LogLevel.Error,
@@ -437,8 +439,8 @@ public class PhotoOrganizerService : IPhotoOrganizerService
             stopwatch.Stop();
 
             string completionSummary = fallbackCount > 0
-                ? $"完了: 合計 {totalFiles} 件 (コピー: {copiedCount} 件, スキップ: {skippedCount} 件, エラー: {errorCount} 件) ※うち {fallbackCount} 件はExif欠損のためファイル名/作成日時から判定 所要時間: {stopwatch.Elapsed:mm\\:ss}"
-                : $"完了: 合計 {totalFiles} 件 (コピー: {copiedCount} 件, スキップ: {skippedCount} 件, エラー: {errorCount} 件) 所要時間: {stopwatch.Elapsed:mm\\:ss}";
+                ? strings.OrganizeCompleteWithFallbackFormat(copiedCount, fallbackCount, skippedCount, stopwatch.Elapsed)
+                : strings.OrganizeCompleteStandardFormat(copiedCount, skippedCount, errorCount, stopwatch.Elapsed);
 
             progress.Report(new OrganizeProgress
             {
@@ -449,7 +451,7 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 SkippedCount = skippedCount,
                 ErrorCount = errorCount,
                 FallbackCount = fallbackCount,
-                StatusMessage = "すべてのファイルの整理が完了しました。",
+                StatusMessage = completionSummary,
                 NewLogEntry = new LogEntry
                 {
                     Level = fallbackCount > 0 ? LogLevel.Warning : LogLevel.Info,
