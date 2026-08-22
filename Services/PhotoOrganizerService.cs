@@ -477,11 +477,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 SkippedCount = skippedCount,
                 ErrorCount = errorCount,
                 FallbackCount = fallbackCount,
-                StatusMessage = "処理がユーザーによってキャンセルされました。",
+                StatusMessage = strings.StatusCancelled,
                 NewLogEntry = new LogEntry
                 {
                     Level = LogLevel.Warning,
-                    Message = $"処理が中断されました。(コピー済み: {copiedCount} 件, スキップ: {skippedCount} 件)"
+                    Message = string.Format(strings.LogCancelledSummaryFormat, copiedCount, skippedCount)
                 }
             });
 

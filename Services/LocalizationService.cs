@@ -135,6 +135,7 @@ public abstract class Strings
     public abstract string NoteCreationFallbackFormat { get; }
     public abstract string LogCloudAccessErrorFormat { get; }
     public abstract string LogGenericErrorFormat { get; }
+    public abstract string LogCancelledSummaryFormat { get; }
     public abstract string LogCompletionSummaryFormat { get; }
     public abstract string LogCompletionSummaryWithFallbackFormat { get; }
 
@@ -247,6 +248,7 @@ public class JapaneseStrings : Strings
     public override string NoteCreationFallbackFormat => " (⚠ Exif欠損: ファイル作成日時 {0:yyyy-MM-dd} を使用)";
     public override string LogCloudAccessErrorFormat => "[エラー] {0}: OneDrive/クラウド専用ファイルへのアクセスに失敗しました。ローカルにダウンロードされていないか、同期が停止している可能性があります。";
     public override string LogGenericErrorFormat => "[エラー] {0}: {1}";
+    public override string LogCancelledSummaryFormat => "処理が中断されました。(コピー済み: {0} 件, スキップ: {1} 件)";
     public override string LogCompletionSummaryFormat => "完了: 合計 {0} 件 (コピー: {1} 件, スキップ: {2} 件, エラー: {3} 件) 所要時間: {4}";
     public override string LogCompletionSummaryWithFallbackFormat => "完了: 合計 {0} 件 (コピー: {1} 件, スキップ: {2} 件, エラー: {3} 件) ※うち {4} 件はExif欠損のためファイル名/作成日時から判定 所要時間: {5}";
 
@@ -358,6 +360,7 @@ public class EnglishStrings : Strings
     public override string NoteCreationFallbackFormat => " (⚠ Missing Exif: Used file creation date {0:yyyy-MM-dd})";
     public override string LogCloudAccessErrorFormat => "[Error] {0}: Failed to access cloud-only file. It may not be downloaded locally or sync is paused.";
     public override string LogGenericErrorFormat => "[Error] {0}: {1}";
+    public override string LogCancelledSummaryFormat => "Operation cancelled. (Copied: {0}, Skipped: {1})";
     public override string LogCompletionSummaryFormat => "Completed: Total {0} file(s) (Copied: {1}, Skipped: {2}, Errors: {3}) Duration: {4}";
     public override string LogCompletionSummaryWithFallbackFormat => "Completed: Total {0} file(s) (Copied: {1}, Skipped: {2}, Errors: {3}) *{4} missing Exif; inferred from filename/date Duration: {5}";
 
