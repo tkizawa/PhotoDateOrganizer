@@ -21,10 +21,10 @@ public class LogEntry
 
     public string LevelBadge => Level switch
     {
-        LogLevel.Success => Services.LocalizationService.Current.Strings.LogLevelSuccess,
-        LogLevel.Warning => Services.LocalizationService.Current.Strings.LogLevelWarning,
-        LogLevel.Error => Services.LocalizationService.Current.Strings.LogLevelError,
-        _ => Services.LocalizationService.Current.Strings.LogLevelInfo
+        LogLevel.Success => Services.LocalizationService.Strings.BadgeSuccess,
+        LogLevel.Warning => Services.LocalizationService.Strings.BadgeWarning,
+        LogLevel.Error => Services.LocalizationService.Strings.BadgeError,
+        _ => Services.LocalizationService.Strings.BadgeInfo
     };
 
 #if HAS_WINUI

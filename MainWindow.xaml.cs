@@ -87,8 +87,7 @@ public sealed partial class MainWindow : Window
         ViewModel.RequestExportFilePickerAsync += PickExportFileAsync;
 
         // アプリバージョンを含むウィンドウタイトルを設定
-        UpdateTitle();
-        LocalizationService.Current.PropertyChanged += (_, _) => UpdateTitle();
+        this.Title = string.Format(LocalizationService.Strings.WindowTitleFormat, ViewModel.AppVersionDisplay);
 
         // ウィンドウアイコンの設定
         try
@@ -161,7 +160,7 @@ public sealed partial class MainWindow : Window
 
     private void UpdateTitle()
     {
-        this.Title = $"PhotoDateOrganizer {ViewModel.AppVersionDisplay} - {(LocalizationService.Current.IsJapanese ? "写真・動画撮影日時自動整理" : "Auto Organize Photos & Videos by Date")}";
+        this.Title = $"PhotoDateOrganizer {ViewModel.AppVersionDisplay} - {(LocalizationService.Instance.IsJapanese ? "写真・動画撮影日時自動整理" : "Auto Organize Photos & Videos by Date")}";
     }
 
     /// <summary>
@@ -172,8 +171,7 @@ public sealed partial class MainWindow : Window
         var settings = _settingsService.LoadSettings();
         _initialSettings = settings;
 
-        // 言語設定の復元
-        LocalizationService.Current.Language = LocalizationService.ParseLanguage(settings.Language);
+        // 言語設定の復元 (OS設定に依存するためパースは不要)
 
         // 免責事項の同意状態を復元
         _isDisclaimerAccepted = settings.IsDisclaimerAccepted;
@@ -281,13 +279,13 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var strings = LocalizationService.Current.Strings;
+        var s = LocalizationService.Strings;
 
         var dialog = new ContentDialog
         {
-            Title = strings.DisclaimerDialogTitle,
-            PrimaryButtonText = strings.DisclaimerAgreeButton,
-            CloseButtonText = strings.DisclaimerDisagreeButton,
+            Title = s.DisclaimerDialogTitle,
+            PrimaryButtonText = s.DisclaimerAcceptButton,
+            CloseButtonText = s.DisclaimerDeclineButton,
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = this.Content.XamlRoot
         };
@@ -329,7 +327,7 @@ public sealed partial class MainWindow : Window
 
         var cautionText = new TextBlock
         {
-            Text = strings.DisclaimerCautionBanner,
+            Text = s.DisclaimerCautionBanner,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             TextWrapping = TextWrapping.Wrap,
             VerticalAlignment = VerticalAlignment.Center
@@ -346,29 +344,12 @@ public sealed partial class MainWindow : Window
             Spacing = 12
         };
 
-        itemsStack.Children.Add(CreateDisclaimerItem(
-            strings.DisclaimerItem1Title,
-            strings.DisclaimerItem1Desc));
-
-        itemsStack.Children.Add(CreateDisclaimerItem(
-            strings.DisclaimerItem2Title,
-            strings.DisclaimerItem2Desc));
-
-        itemsStack.Children.Add(CreateDisclaimerItem(
-            strings.DisclaimerItem3Title,
-            strings.DisclaimerItem3Desc));
-
-        itemsStack.Children.Add(CreateDisclaimerItem(
-            strings.DisclaimerItem4Title,
-            strings.DisclaimerItem4Desc));
-
-        itemsStack.Children.Add(CreateDisclaimerItem(
-            strings.DisclaimerItem5Title,
-            strings.DisclaimerItem5Desc));
-
-        itemsStack.Children.Add(CreateDisclaimerItem(
-            strings.DisclaimerItem6Title,
-            strings.DisclaimerItem6Desc));
+        itemsStack.Children.Add(CreateDisclaimerItem(s.DisclaimerItem1Title, s.DisclaimerItem1Body));
+        itemsStack.Children.Add(CreateDisclaimerItem(s.DisclaimerItem2Title, s.DisclaimerItem2Body));
+        itemsStack.Children.Add(CreateDisclaimerItem(s.DisclaimerItem3Title, s.DisclaimerItem3Body));
+        itemsStack.Children.Add(CreateDisclaimerItem(s.DisclaimerItem4Title, s.DisclaimerItem4Body));
+        itemsStack.Children.Add(CreateDisclaimerItem(s.DisclaimerItem5Title, s.DisclaimerItem5Body));
+        itemsStack.Children.Add(CreateDisclaimerItem(s.DisclaimerItem6Title, s.DisclaimerItem6Body));
 
         var scrollViewer = new ScrollViewer
         {
@@ -502,7 +483,7 @@ public sealed partial class MainWindow : Window
                 SourceDirectory = ViewModel?.SourceDirectory ?? string.Empty,
                 DestinationDirectory = ViewModel?.DestinationDirectory ?? string.Empty,
                 CloudFileMode = ViewModel?.CloudFileMode ?? CloudFileHandlingMode.Download,
-                Language = LocalizationService.Current.Language.ToString().ToLowerInvariant(),
+                Language = LocalizationService.Instance.IsJapanese ? "ja" : "en",
                 IsDisclaimerAccepted = _isDisclaimerAccepted
             };
 
@@ -588,7 +569,7 @@ public sealed partial class MainWindow : Window
         InitializeWithWindow.Initialize(savePicker, hwnd);
 
         savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-        savePicker.FileTypeChoices.Add(LocalizationService.Current.Strings.JsonFilePickerFilterName, new[] { ".json" });
+        savePicker.FileTypeChoices.Add(LocalizationService.Strings.JsonFileFilterName, new[] { ".json" });
         savePicker.SuggestedFileName = "PhotoDateOrganizer_settings.json";
 
         var file = await savePicker.PickSaveFileAsync();

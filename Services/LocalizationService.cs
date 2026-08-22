@@ -1,466 +1,380 @@
 using System;
-using System.ComponentModel;
 using System.Globalization;
-using System.Runtime.CompilerServices;
+using PhotoDateOrganizer.Models;
 
 namespace PhotoDateOrganizer.Services;
 
-public enum AppLanguage
+/// <summary>
+/// アプリケーション全体の多言語（日本語・英語）表示を管理するサービスクラス
+/// </summary>
+public class LocalizationService
 {
-    Auto,
-    Japanese,
-    English
+    private static LocalizationService? _instance;
+    public static LocalizationService Instance => _instance ??= new LocalizationService();
+
+    public static Strings Strings => Instance.CurrentStrings;
+
+    public Strings CurrentStrings { get; private set; }
+
+    public bool IsJapanese { get; private set; }
+
+    public LocalizationService()
+    {
+        // OSの表示言語（UI Culture）が日本語系であれば日本語、それ以外は英語を適用
+        var culture = CultureInfo.CurrentUICulture;
+        IsJapanese = culture.Name.StartsWith("ja", StringComparison.OrdinalIgnoreCase);
+        CurrentStrings = IsJapanese ? new JapaneseStrings() : new EnglishStrings();
+    }
+
+    /// <summary>
+    /// テストや切り替え用：明示的にカルチャを設定します。
+    /// </summary>
+    public void SetCulture(CultureInfo culture)
+    {
+        IsJapanese = culture.Name.StartsWith("ja", StringComparison.OrdinalIgnoreCase);
+        CurrentStrings = IsJapanese ? new JapaneseStrings() : new EnglishStrings();
+    }
 }
 
 /// <summary>
-/// アプリケーション内で使用される全テキストの定義インターフェース/ベースクラス
+/// 多言語リソースの基底・共通インターフェースクラス
 /// </summary>
-public abstract class AppStrings
+public abstract class Strings
 {
-    // Common
     public abstract string AppTitle { get; }
-    public abstract string AppDescription { get; }
+    public abstract string AppSubtitle { get; }
+    public abstract string WindowTitleFormat { get; }
 
-    // Header Actions
-    public abstract string ImportSettings { get; }
-    public abstract string ImportSettingsToolTip { get; }
-    public abstract string ExportSettings { get; }
-    public abstract string ExportSettingsToolTip { get; }
-    public abstract string OpenDestination { get; }
-    public abstract string OpenDestinationToolTip { get; }
+    // ヘッダーボタン
+    public abstract string ImportSettingsButton { get; }
+    public abstract string ImportSettingsTooltip { get; }
+    public abstract string ExportSettingsButton { get; }
+    public abstract string ExportSettingsTooltip { get; }
+    public abstract string OpenDestinationButton { get; }
+    public abstract string OpenDestinationTooltip { get; }
 
-    // Folder Setup Card
-    public abstract string FolderSettingsTitle { get; }
+    // フォルダ設定カード
+    public abstract string FolderSetupTitle { get; }
     public abstract string SourceFolderLabel { get; }
     public abstract string SourceFolderPlaceholder { get; }
     public abstract string DestinationFolderLabel { get; }
     public abstract string DestinationFolderPlaceholder { get; }
     public abstract string BrowseButton { get; }
 
-    // Cloud Options
-    public abstract string CloudOptionsLabel { get; }
-    public abstract string CloudModeDownloadContent { get; }
-    public abstract string CloudModeDownloadToolTip { get; }
-    public abstract string CloudModeSkipContent { get; }
-    public abstract string CloudModeSkipToolTip { get; }
+    // クラウドファイル設定
+    public abstract string CloudFilesGroupLabel { get; }
+    public abstract string CloudModeDownloadOption { get; }
+    public abstract string CloudModeDownloadTooltip { get; }
+    public abstract string CloudModeSkipOption { get; }
+    public abstract string CloudModeSkipTooltip { get; }
     public abstract string SupportedFormatsInfo { get; }
 
-    // Controls Card
-    public abstract string StartButton { get; }
+    // コントロールボタン・状態
+    public abstract string StartOrganizingButton { get; }
     public abstract string CancelButton { get; }
+    public abstract string StatusReady { get; }
+    public abstract string StatusProcessing { get; }
+    public abstract string StatusCancelled { get; }
+    public abstract string StatusCompletedFormat { get; }
+    public abstract string StatusCompletedWithFallbackFormat { get; }
+    public abstract string StatusErrorFormat { get; }
 
-    // Progress & Statistics Card
-    public abstract string ProgressTitle { get; }
-    public abstract string CurrentProcessingFileLabel { get; }
+    // 進捗・統計カード
+    public abstract string ProgressAndStatsTitle { get; }
+    public abstract string ProcessingFileLabel { get; }
+    public abstract string FallbackNoticeFormat { get; }
+    public abstract string FallbackProgressNoticeFormat { get; }
     public abstract string StatTotal { get; }
     public abstract string StatCopied { get; }
     public abstract string StatFallback { get; }
-    public abstract string StatFallbackToolTip { get; }
+    public abstract string StatFallbackTooltip { get; }
     public abstract string StatSkipped { get; }
-    public abstract string StatErrors { get; }
+    public abstract string StatError { get; }
 
-    // Activity Log
-    public abstract string ActivityLogTitle { get; }
+    // ログエリア
+    public abstract string LogTitle { get; }
     public abstract string ClearLogsButton { get; }
-    public abstract string ClearLogsToolTip { get; }
+    public abstract string ClearLogsTooltip { get; }
 
-    // Log Badges
-    public abstract string LogLevelSuccess { get; }
-    public abstract string LogLevelWarning { get; }
-    public abstract string LogLevelError { get; }
-    public abstract string LogLevelInfo { get; }
+    // ログレベルバッジ
+    public abstract string BadgeSuccess { get; }
+    public abstract string BadgeWarning { get; }
+    public abstract string BadgeError { get; }
+    public abstract string BadgeInfo { get; }
 
-    // Status & Log Messages in ViewModel / Service
-    public abstract string ReadyStatus { get; }
-    public abstract string SourceFolderNotFound { get; }
-    public abstract string SourceFolderSetFormat(string folder);
-    public abstract string DestinationFolderSetFormat(string folder);
-    public abstract string StartOrganizingProcess { get; }
-    public abstract string OperationCancelled { get; }
-    public abstract string RequestingCancellation { get; }
-    public abstract string CancellationRequestedByUser { get; }
-    public abstract string ErrorFormat(string message);
-    public abstract string ExceptionErrorFormat(string message);
-    public abstract string FallbackNoticeFormat(int count);
-    public abstract string FallbackNoticeProgressFormat(int count);
-    public abstract string OrganizeCompleteWithFallbackFormat(int copied, int fallback, int skipped, TimeSpan duration);
-    public abstract string OrganizeCompleteStandardFormat(int copied, int skipped, int errors, TimeSpan duration);
-    public abstract string CannotOpenFolderFormat(string message);
-    public abstract string SettingsImportedFormat(string path);
-    public abstract string SettingsImportedSummaryFormat(string fileName);
-    public abstract string SettingsImportFailedFormat(string message);
-    public abstract string SettingsExportedFormat(string path);
-    public abstract string SettingsExportedSummaryFormat(string fileName);
-    public abstract string SettingsExportFailedFormat(string message);
+    // ログメッセージ & 通知
+    public abstract string LogStartOrganizing { get; }
+    public abstract string LogSourceSetFormat { get; }
+    public abstract string LogDestinationSetFormat { get; }
+    public abstract string LogSettingsImportedFormat { get; }
+    public abstract string LogSettingsExportedFormat { get; }
+    public abstract string LogSettingsImportErrorFormat { get; }
+    public abstract string LogSettingsExportErrorFormat { get; }
+    public abstract string LogErrorSourceNotExist { get; }
+    public abstract string JsonFileFilterName { get; }
 
-    // Service Organizing Progress / Logs
-    public abstract string ScanningFilesStatus { get; }
-    public abstract string ScanningStartLog(string directory);
-    public abstract string ScanCompletedStatus(int count);
-    public abstract string ScanDetectedLog(int count);
-    public abstract string SkipCloudOnlyStatus(string fileName);
-    public abstract string SkipCloudOnlyLog(string fileName);
-    public abstract string DownloadingCloudFileStatus(string fileName);
-    public abstract string DownloadingCloudFileLog(string fileName);
-    public abstract string DownloadCloudFileFailedStatus(string fileName);
-    public abstract string DownloadCloudFileFailedLog(string fileName);
-    public abstract string SkipDuplicateStatus(string fileName);
-    public abstract string SkipDuplicateLog(string fileName, string relativePath);
-    public abstract string CopyCompleteStatus(string fileName);
-    public abstract string CopyLog(string fileName, string relativePath, string note);
-    public abstract string ErrorCloudAccessLog(string fileName);
-    public abstract string ErrorGeneralLog(string fileName, string message);
+    // 整理処理実行中のログ & ステータス
+    public abstract string StatusScanning { get; }
+    public abstract string LogScanningStartedFormat { get; }
+    public abstract string StatusScanCompletedFormat { get; }
+    public abstract string LogScanCompletedFormat { get; }
+    public abstract string StatusCloudSkipFormat { get; }
+    public abstract string LogCloudSkipFormat { get; }
+    public abstract string StatusDownloadingFormat { get; }
+    public abstract string LogDownloadingFormat { get; }
+    public abstract string StatusDownloadErrorFormat { get; }
+    public abstract string LogDownloadErrorFormat { get; }
+    public abstract string StatusDuplicateSkipFormat { get; }
+    public abstract string LogDuplicateSkipFormat { get; }
+    public abstract string StatusCopiedFormat { get; }
+    public abstract string LogCopiedFormat { get; }
+    public abstract string NoteExifFormat { get; }
+    public abstract string NoteVideoFormat { get; }
+    public abstract string NoteFilenameFallbackFormat { get; }
+    public abstract string NoteModifiedFallbackFormat { get; }
+    public abstract string NoteCreationFallbackFormat { get; }
+    public abstract string LogCloudAccessErrorFormat { get; }
+    public abstract string LogGenericErrorFormat { get; }
+    public abstract string LogCompletionSummaryFormat { get; }
+    public abstract string LogCompletionSummaryWithFallbackFormat { get; }
 
-    // Note formatting
-    public abstract string NoteExif(DateTime date);
-    public abstract string NoteQuickTime(DateTime date);
-    public abstract string NoteFilenamePattern(DateTime date);
-    public abstract string NoteFileModified(DateTime date);
-    public abstract string NoteFileCreated(DateTime date);
-
-    // Disclaimer Dialog
+    // 免責事項ダイアログ
     public abstract string DisclaimerDialogTitle { get; }
-    public abstract string DisclaimerAgreeButton { get; }
-    public abstract string DisclaimerDisagreeButton { get; }
+    public abstract string DisclaimerAcceptButton { get; }
+    public abstract string DisclaimerDeclineButton { get; }
     public abstract string DisclaimerCautionBanner { get; }
     public abstract string DisclaimerItem1Title { get; }
-    public abstract string DisclaimerItem1Desc { get; }
+    public abstract string DisclaimerItem1Body { get; }
     public abstract string DisclaimerItem2Title { get; }
-    public abstract string DisclaimerItem2Desc { get; }
+    public abstract string DisclaimerItem2Body { get; }
     public abstract string DisclaimerItem3Title { get; }
-    public abstract string DisclaimerItem3Desc { get; }
+    public abstract string DisclaimerItem3Body { get; }
     public abstract string DisclaimerItem4Title { get; }
-    public abstract string DisclaimerItem4Desc { get; }
+    public abstract string DisclaimerItem4Body { get; }
     public abstract string DisclaimerItem5Title { get; }
-    public abstract string DisclaimerItem5Desc { get; }
+    public abstract string DisclaimerItem5Body { get; }
     public abstract string DisclaimerItem6Title { get; }
-    public abstract string DisclaimerItem6Desc { get; }
-
-    // Pickers
-    public abstract string JsonFilePickerFilterName { get; }
+    public abstract string DisclaimerItem6Body { get; }
 }
 
 /// <summary>
 /// 日本語リソース実装
 /// </summary>
-public class JapaneseStrings : AppStrings
+public class JapaneseStrings : Strings
 {
-    public override string AppTitle => "PhotoDateOrganizer - 写真・動画撮影日時自動整理";
-    public override string AppDescription => "iPhoneやデジカメのExif/動画メタデータを解析し、撮影日ごとの階層フォルダ（YYYY\\YYYY-MM\\YYYY-MM-DD）へ自動整理します。";
+    public override string AppTitle => "PhotoDateOrganizer";
+    public override string AppSubtitle => "iPhoneやデジカメのExif/動画メタデータを解析し、撮影日ごとの階層フォルダ（YYYY\\YYYY-MM\\YYYY-MM-DD）へ自動整理します。";
+    public override string WindowTitleFormat => "PhotoDateOrganizer {0} - 写真・動画撮影日時自動整理";
 
-    public override string ImportSettings => "設定インポート";
-    public override string ImportSettingsToolTip => "設定ファイル (JSON) をインポート";
-    public override string ExportSettings => "設定エクスポート";
-    public override string ExportSettingsToolTip => "現在の設定をJSONファイルへエクスポート";
-    public override string OpenDestination => "出力先を開く";
-    public override string OpenDestinationToolTip => "出力先フォルダをエクスプローラーで開く";
+    public override string ImportSettingsButton => "設定インポート";
+    public override string ImportSettingsTooltip => "設定ファイル (JSON) をインポート";
+    public override string ExportSettingsButton => "設定エクスポート";
+    public override string ExportSettingsTooltip => "現在の設定をJSONファイルへエクスポート";
+    public override string OpenDestinationButton => "出力先を開く";
+    public override string OpenDestinationTooltip => "出力先フォルダをエクスプローラーで開く";
 
-    public override string FolderSettingsTitle => "フォルダ設定";
+    public override string FolderSetupTitle => "フォルダ設定";
     public override string SourceFolderLabel => "整理元フォルダ (写真・動画の保存場所):";
     public override string SourceFolderPlaceholder => @"例: C:\Users\Username\Pictures\iPhone";
     public override string DestinationFolderLabel => "整理後出力先フォルダ:";
     public override string DestinationFolderPlaceholder => @"例: D:\OrganizedPhotos";
     public override string BrowseButton => "選択...";
 
-    public override string CloudOptionsLabel => "OneDrive / SharePoint オンライン専用（未ダウンロード）ファイルの扱い:";
-    public override string CloudModeDownloadContent => "オンライン専用ファイルをダウンロードして整理する（推奨）";
-    public override string CloudModeDownloadToolTip => "未ダウンロードのファイルもクラウドから取得してExif解析・整理コピーを行います。";
-    public override string CloudModeSkipContent => "オンライン専用ファイルはスキップする（通信なし）";
-    public override string CloudModeSkipToolTip => "通信量を発生させず、ローカルにダウンロード済みのファイルのみを整理対象とします。";
+    public override string CloudFilesGroupLabel => "OneDrive / SharePoint オンライン専用（未ダウンロード）ファイルの扱い:";
+    public override string CloudModeDownloadOption => "オンライン専用ファイルをダウンロードして整理する（推奨）";
+    public override string CloudModeDownloadTooltip => "未ダウンロードのファイルもクラウドから取得してExif解析・整理コピーを行います。";
+    public override string CloudModeSkipOption => "オンライン専用ファイルはスキップする（通信なし）";
+    public override string CloudModeSkipTooltip => "通信量を発生させず、ローカルにダウンロード済みのファイルのみを整理対象とします。";
     public override string SupportedFormatsInfo => "対象形式: .jpg, .jpeg, .heic, .png, .mov, .mp4（同名ファイルはハッシュ比較で自動判別・連番付与）";
 
-    public override string StartButton => "整理を開始する";
+    public override string StartOrganizingButton => "整理を開始する";
     public override string CancelButton => "キャンセル";
+    public override string StatusReady => "準備完了: 整理元フォルダと出力先フォルダを選択してください。";
+    public override string StatusProcessing => "整理処理中...";
+    public override string StatusCancelled => "処理がキャンセルされました。";
+    public override string StatusCompletedFormat => "整理完了: {0} 件コピー, {1} 件スキップ, {2} 件エラー ({3})";
+    public override string StatusCompletedWithFallbackFormat => "整理完了: {0} 件コピー (うち {1} 件はExif欠損), {2} 件スキップ ({3})";
+    public override string StatusErrorFormat => "エラー: {0}";
 
-    public override string ProgressTitle => "処理進捗 & 統計";
-    public override string CurrentProcessingFileLabel => "処理中ファイル:";
+    public override string ProgressAndStatsTitle => "処理進捗 & 統計";
+    public override string ProcessingFileLabel => "処理中ファイル:";
+    public override string FallbackNoticeFormat => "💡 注意: {0} 件のファイルはExifメタデータが無いため、ファイル名またはタイムスタンプから判定しました。";
+    public override string FallbackProgressNoticeFormat => "💡 注意: {0} 件のファイルはExif欠損のため、ファイル名またはタイムスタンプから判定中です。";
     public override string StatTotal => "総検出数";
     public override string StatCopied => "コピー完了";
     public override string StatFallback => "Exif欠損";
-    public override string StatFallbackToolTip => "Exifメタデータが無いためファイル名やタイムスタンプを使用した件数";
+    public override string StatFallbackTooltip => "Exifメタデータが無いためファイル名やタイムスタンプを使用した件数";
     public override string StatSkipped => "スキップ";
-    public override string StatErrors => "エラー";
+    public override string StatError => "エラー";
 
-    public override string ActivityLogTitle => "処理ログ";
+    public override string LogTitle => "処理ログ";
     public override string ClearLogsButton => "クリア";
-    public override string ClearLogsToolTip => "ログをクリア";
+    public override string ClearLogsTooltip => "ログをクリア";
 
-    public override string LogLevelSuccess => "✓ 成功";
-    public override string LogLevelWarning => "⚠ 警告";
-    public override string LogLevelError => "✕ エラー";
-    public override string LogLevelInfo => "ℹ 情報";
+    public override string BadgeSuccess => "✓ 成功";
+    public override string BadgeWarning => "⚠ 警告";
+    public override string BadgeError => "✕ エラー";
+    public override string BadgeInfo => "ℹ 情報";
 
-    public override string ReadyStatus => "準備完了: ソースフォルダと出力先フォルダを選択してください。";
-    public override string SourceFolderNotFound => "エラー: ソースフォルダが存在しません。";
-    public override string SourceFolderSetFormat(string folder) => $"ソースフォルダを設定: {folder}";
-    public override string DestinationFolderSetFormat(string folder) => $"出力先フォルダを設定: {folder}";
-    public override string StartOrganizingProcess => "整理処理を開始します...";
-    public override string OperationCancelled => "処理がキャンセルされました。";
-    public override string RequestingCancellation => "キャンセルを要求中...";
-    public override string CancellationRequestedByUser => "ユーザーによるキャンセルが要求されました。";
-    public override string ErrorFormat(string message) => $"エラー: {message}";
-    public override string ExceptionErrorFormat(string message) => $"例外エラー: {message}";
-    public override string FallbackNoticeFormat(int count) => $"💡 注意: {count} 件のファイルはExifメタデータが無いため、ファイル名またはタイムスタンプから判定しました。";
-    public override string FallbackNoticeProgressFormat(int count) => $"💡 注意: {count} 件のファイルはExif欠損のため、ファイル名またはタイムスタンプから判定中です。";
-    public override string OrganizeCompleteWithFallbackFormat(int copied, int fallback, int skipped, TimeSpan duration) =>
-        $"整理完了: {copied} 件コピー (うち {fallback} 件はExif欠損), {skipped} 件スキップ ({duration:mm\\:ss})";
-    public override string OrganizeCompleteStandardFormat(int copied, int skipped, int errors, TimeSpan duration) =>
-        $"整理完了: {copied} 件コピー, {skipped} 件スキップ, {errors} 件エラー ({duration:mm\\:ss})";
-    public override string CannotOpenFolderFormat(string message) => $"フォルダを開けませんでした: {message}";
-    public override string SettingsImportedFormat(string path) => $"設定をインポートしました: {path}";
-    public override string SettingsImportedSummaryFormat(string fileName) => $"設定をインポートしました ({fileName})";
-    public override string SettingsImportFailedFormat(string message) => $"設定のインポートに失敗しました: {message}";
-    public override string SettingsExportedFormat(string path) => $"設定をエクスポートしました: {path}";
-    public override string SettingsExportedSummaryFormat(string fileName) => $"設定をエクスポートしました ({fileName})";
-    public override string SettingsExportFailedFormat(string message) => $"設定のエクスポートに失敗しました: {message}";
+    public override string LogStartOrganizing => "整理処理を開始します...";
+    public override string LogSourceSetFormat => "整理元フォルダを設定: {0}";
+    public override string LogDestinationSetFormat => "出力先フォルダを設定: {0}";
+    public override string LogSettingsImportedFormat => "設定をインポートしました: {0}";
+    public override string LogSettingsExportedFormat => "設定をエクスポートしました: {0}";
+    public override string LogSettingsImportErrorFormat => "設定インポートエラー: {0}";
+    public override string LogSettingsExportErrorFormat => "設定エクスポートエラー: {0}";
+    public override string LogErrorSourceNotExist => "エラー: 整理元フォルダが存在しません。";
+    public override string JsonFileFilterName => "JSON ファイル (*.json)";
 
-    public override string ScanningFilesStatus => "ファイルをスキャン中...";
-    public override string ScanningStartLog(string directory) => $"スキャン開始: {directory}";
-    public override string ScanCompletedStatus(int count) => $"スキャン完了: {count} 件の対象ファイルが見つかりました";
-    public override string ScanDetectedLog(int count) => $"{count} 件の対象写真・動画ファイルを検出しました。";
-    public override string SkipCloudOnlyStatus(string fileName) => $"スキップ: {fileName}（OneDrive/クラウド専用ファイル）";
-    public override string SkipCloudOnlyLog(string fileName) => $"[スキップ] クラウド専用ファイルのためスキップしました（ローカルに未ダウンロード）: {fileName}";
-    public override string DownloadingCloudFileStatus(string fileName) => $"ダウンロード中: {fileName} (クラウドから取得中...)";
-    public override string DownloadingCloudFileLog(string fileName) => $"[ダウンロード中] クラウド専用ファイルを一時ダウンロードしています: {fileName}";
-    public override string DownloadCloudFileFailedStatus(string fileName) => $"エラー: {fileName} (ダウンロード失敗)";
-    public override string DownloadCloudFileFailedLog(string fileName) => $"[エラー] {fileName}: クラウドからのダウンロードに失敗しました。";
-    public override string SkipDuplicateStatus(string fileName) => $"スキップ: {fileName}（同一ファイルが既に存在）";
-    public override string SkipDuplicateLog(string fileName, string relativePath) => $"[スキップ] 同一ファイルが既に存在します: {fileName} -> {relativePath}";
-    public override string CopyCompleteStatus(string fileName) => $"コピー完了: {fileName}";
-    public override string CopyLog(string fileName, string relativePath, string note) => $"[コピー] {fileName} -> {relativePath}{note}";
-    public override string ErrorCloudAccessLog(string fileName) => $"[エラー] {fileName}: OneDrive/クラウド専用ファイルへのアクセスに失敗しました。ローカルにダウンロードされていないか、同期が停止している可能性があります。";
-    public override string ErrorGeneralLog(string fileName, string message) => $"[エラー] {fileName}: {message}";
-
-    public override string NoteExif(DateTime date) => $" (Exif: {date:yyyy-MM-dd HH:mm:ss})";
-    public override string NoteQuickTime(DateTime date) => $" (動画メタデータ: {date:yyyy-MM-dd HH:mm:ss})";
-    public override string NoteFilenamePattern(DateTime date) => $" (💡 Exif欠損: ファイル名から「{date:yyyy-MM-dd}」を推定)";
-    public override string NoteFileModified(DateTime date) => $" (⚠ Exif欠損: ファイル更新日時 {date:yyyy-MM-dd} を使用)";
-    public override string NoteFileCreated(DateTime date) => $" (⚠ Exif欠損: ファイル作成日時 {date:yyyy-MM-dd} を使用)";
+    public override string StatusScanning => "ファイルをスキャン中...";
+    public override string LogScanningStartedFormat => "スキャン開始: {0}";
+    public override string StatusScanCompletedFormat => "スキャン完了: {0} 件の対象ファイルが見つかりました";
+    public override string LogScanCompletedFormat => "{0} 件の対象写真・動画ファイルを検出しました。";
+    public override string StatusCloudSkipFormat => "スキップ: {0}（OneDrive/クラウド専用ファイル）";
+    public override string LogCloudSkipFormat => "[スキップ] クラウド専用ファイルのためスキップしました（ローカルに未ダウンロード）: {0}";
+    public override string StatusDownloadingFormat => "ダウンロード中: {0} (クラウドから取得中...)";
+    public override string LogDownloadingFormat => "[ダウンロード中] クラウド専用ファイルを一時ダウンロードしています: {0}";
+    public override string StatusDownloadErrorFormat => "エラー: {0} (ダウンロード失敗)";
+    public override string LogDownloadErrorFormat => "[エラー] {0}: クラウドからのダウンロードに失敗しました。";
+    public override string StatusDuplicateSkipFormat => "スキップ: {0}（同一ファイルが既に存在）";
+    public override string LogDuplicateSkipFormat => "[スキップ] 同一ファイルが既に存在します: {0} -> {1}";
+    public override string StatusCopiedFormat => "コピー完了: {0}";
+    public override string LogCopiedFormat => "[コピー] {0} -> {1}{2}";
+    public override string NoteExifFormat => " (Exif: {0:yyyy-MM-dd HH:mm:ss})";
+    public override string NoteVideoFormat => " (動画メタデータ: {0:yyyy-MM-dd HH:mm:ss})";
+    public override string NoteFilenameFallbackFormat => " (💡 Exif欠損: ファイル名から「{0:yyyy-MM-dd}」を推定)";
+    public override string NoteModifiedFallbackFormat => " (⚠ Exif欠損: ファイル更新日時 {0:yyyy-MM-dd} を使用)";
+    public override string NoteCreationFallbackFormat => " (⚠ Exif欠損: ファイル作成日時 {0:yyyy-MM-dd} を使用)";
+    public override string LogCloudAccessErrorFormat => "[エラー] {0}: OneDrive/クラウド専用ファイルへのアクセスに失敗しました。ローカルにダウンロードされていないか、同期が停止している可能性があります。";
+    public override string LogGenericErrorFormat => "[エラー] {0}: {1}";
+    public override string LogCompletionSummaryFormat => "完了: 合計 {0} 件 (コピー: {1} 件, スキップ: {2} 件, エラー: {3} 件) 所要時間: {4}";
+    public override string LogCompletionSummaryWithFallbackFormat => "完了: 合計 {0} 件 (コピー: {1} 件, スキップ: {2} 件, エラー: {3} 件) ※うち {4} 件はExif欠損のためファイル名/作成日時から判定 所要時間: {5}";
 
     public override string DisclaimerDialogTitle => "⚠️ ご利用上の注意事項・免責事項 (Disclaimer)";
-    public override string DisclaimerAgreeButton => "同意して利用を開始する";
-    public override string DisclaimerDisagreeButton => "同意しない (終了)";
+    public override string DisclaimerAcceptButton => "同意して利用を開始する";
+    public override string DisclaimerDeclineButton => "同意しない (終了)";
     public override string DisclaimerCautionBanner => "本ソフトウェアをご利用いただく前に、以下の注意事項および免責事項を必ずご確認ください。";
     public override string DisclaimerItem1Title => "1. 原本ファイルの保持とユーザーによる整理・削除の注意";
-    public override string DisclaimerItem1Desc => "本アプリは写真・動画ファイルを日付フォルダへ「コピー」するツールであり、整理元（原本）のファイルを削除・移動・変更する処理は一切行いません。ただし、本アプリによる整理完了後にユーザー自身が原本ファイルを整理・削除する際の誤削除等には十分にご注意ください。";
+    public override string DisclaimerItem1Body => "本アプリは写真・動画ファイルを日付フォルダへ「コピー」するツールであり、整理元（原本）のファイルを削除・移動・変更する処理は一切行いません。ただし、本アプリによる整理完了後にユーザー自身が原本ファイルを整理・削除する際の誤削除等には十分にご注意ください。";
     public override string DisclaimerItem2Title => "2. 無保証 (AS-IS)";
-    public override string DisclaimerItem2Desc => "本ソフトウェアは現状有姿（AS-IS）で提供され、明示的・黙示的を問わず、その正確性、完全性、特定目的への適合性についていかなる保証も行いません。";
+    public override string DisclaimerItem2Body => "本ソフトウェアは現状有姿（AS-IS）で提供され、明示的・黙示的を問わず、その正確性、完全性、特定目的への適合性についていかなる保証も行いません。";
     public override string DisclaimerItem3Title => "3. 事前テストの実施";
-    public override string DisclaimerItem3Desc => "重要な本番データや大容量フォルダに適用する前に、必ず影響のないテスト用フォルダを作成し、ファイルコピーおよび日時分類の動作を十分に検証した上でご利用ください。";
+    public override string DisclaimerItem3Body => "重要な本番データや大容量フォルダに適用する前に、必ず影響のないテスト用フォルダを作成し、ファイルコピーおよび日時分類の動作を十分に検証した上でご利用ください。";
     public override string DisclaimerItem4Title => "4. メタデータおよび撮影日時の判定について";
-    public override string DisclaimerItem4Desc => "Exif や QuickTime などのメタデータが存在しない場合や破損している場合は、ファイルシステムのタイムスタンプ（作成日時等）が代用されます。SNS保存画像や編集済み動画等では正確な撮影日時とならない場合があります。";
+    public override string DisclaimerItem4Body => "Exif や QuickTime などのメタデータが存在しない場合や破損している場合は、ファイルシステムのタイムスタンプ（作成日時等）が代用されます。SNS保存画像や編集済み動画等では正確な撮影日時とならない場合があります。";
     public override string DisclaimerItem5Title => "5. クラウド専用ファイル（OneDrive等）と通信環境に関する注意";
-    public override string DisclaimerItem5Desc => "OneDrive や SharePoint などのオンライン専用（未ダウンロード）ファイルを処理対象とする場合、ネットワーク経由での自動ダウンロードが発生します。通信量や従量制課金環境にご注意ください（設定によりスキップすることも可能です）。";
+    public override string DisclaimerItem5Body => "OneDrive や SharePoint などのオンライン専用（未ダウンロード）ファイルを処理対象とする場合、ネットワーク経由での自動ダウンロードが発生します。通信量や従量制課金環境にご注意ください（設定によりスキップすることも可能です）。";
     public override string DisclaimerItem6Title => "6. 免責事項 (開発者の責任について)";
-    public override string DisclaimerItem6Desc => "本ソフトウェアの使用、設定の誤り、ネットワーク障害、ファイルコピーやメタデータ解析処理等により生じたいかなる損害（データの消失、破損、業務の中断、利益の損失等を含むがこれらに限定されない）について、開発者は一切の責任を負いません。バックアップ等の安全対策は利用者自身の責任で行ってください。";
-
-    public override string JsonFilePickerFilterName => "JSON ファイル (*.json)";
+    public override string DisclaimerItem6Body => "本ソフトウェアの使用、設定の誤り、ネットワーク障害、ファイルコピーやメタデータ解析処理等により生じたいかなる損害（データの消失、破損、業務の中断、利益の損失等を含むがこれらに限定されない）について、開発者は一切の責任を負いません。バックアップ等の安全対策は利用者自身の責任で行ってください。";
 }
 
 /// <summary>
-/// 英語リソース実装
+/// 英語リソース実装 (English Strings)
 /// </summary>
-public class EnglishStrings : AppStrings
+public class EnglishStrings : Strings
 {
-    public override string AppTitle => "PhotoDateOrganizer - Auto Organize Photos & Videos by Date";
-    public override string AppDescription => "Analyzes Exif/video metadata from iPhone and digital cameras, and automatically organizes files into date-based hierarchical folders (YYYY\\YYYY-MM\\YYYY-MM-DD).";
+    public override string AppTitle => "PhotoDateOrganizer";
+    public override string AppSubtitle => "Automatically organizes iPhone and camera photos/videos into hierarchical date folders (YYYY\\YYYY-MM\\YYYY-MM-DD) by parsing Exif/metadata.";
+    public override string WindowTitleFormat => "PhotoDateOrganizer {0} - Date-Based Photo & Video Organizer";
 
-    public override string ImportSettings => "Import Settings";
-    public override string ImportSettingsToolTip => "Import settings file (JSON)";
-    public override string ExportSettings => "Export Settings";
-    public override string ExportSettingsToolTip => "Export current settings to a JSON file";
-    public override string OpenDestination => "Open Destination";
-    public override string OpenDestinationToolTip => "Open destination folder in File Explorer";
+    public override string ImportSettingsButton => "Import Settings";
+    public override string ImportSettingsTooltip => "Import configuration from a JSON file";
+    public override string ExportSettingsButton => "Export Settings";
+    public override string ExportSettingsTooltip => "Export current configuration to a JSON file";
+    public override string OpenDestinationButton => "Open Destination";
+    public override string OpenDestinationTooltip => "Open the output destination folder in File Explorer";
 
-    public override string FolderSettingsTitle => "Folder Settings";
-    public override string SourceFolderLabel => "Source Folder (Photos & Videos Location):";
+    public override string FolderSetupTitle => "Folder Setup";
+    public override string SourceFolderLabel => "Source Folder (where photos/videos are located):";
     public override string SourceFolderPlaceholder => @"e.g. C:\Users\Username\Pictures\iPhone";
     public override string DestinationFolderLabel => "Destination Folder:";
     public override string DestinationFolderPlaceholder => @"e.g. D:\OrganizedPhotos";
     public override string BrowseButton => "Browse...";
 
-    public override string CloudOptionsLabel => "Handling of OneDrive / SharePoint Online-only (not downloaded) files:";
-    public override string CloudModeDownloadContent => "Download and organize online-only files (Recommended)";
-    public override string CloudModeDownloadToolTip => "Downloads online-only files from the cloud to read Exif metadata and copy.";
-    public override string CloudModeSkipContent => "Skip online-only files (No network usage)";
-    public override string CloudModeSkipToolTip => "Avoids network traffic and only organizes files that are already downloaded locally.";
-    public override string SupportedFormatsInfo => "Supported formats: .jpg, .jpeg, .heic, .png, .mov, .mp4 (Duplicates handled via hash comparison & sequential naming)";
+    public override string CloudFilesGroupLabel => "Handling of OneDrive / SharePoint Online-only (unhydrated) files:";
+    public override string CloudModeDownloadOption => "Download online-only files and organize (Recommended)";
+    public override string CloudModeDownloadTooltip => "Downloads online-only files on demand from cloud to parse Exif and copy them.";
+    public override string CloudModeSkipOption => "Skip online-only files (No network usage)";
+    public override string CloudModeSkipTooltip => "Organizes only files already stored locally on disk without downloading.";
+    public override string SupportedFormatsInfo => "Supported formats: .jpg, .jpeg, .heic, .png, .mov, .mp4 (Duplicates are distinguished via hash comparison)";
 
-    public override string StartButton => "Start Organizing";
+    public override string StartOrganizingButton => "Start Organizing";
     public override string CancelButton => "Cancel";
+    public override string StatusReady => "Ready: Select a source folder and destination folder.";
+    public override string StatusProcessing => "Organizing files...";
+    public override string StatusCancelled => "Operation was cancelled.";
+    public override string StatusCompletedFormat => "Completed: {0} copied, {1} skipped, {2} error(s) ({3})";
+    public override string StatusCompletedWithFallbackFormat => "Completed: {0} copied ({1} missing Exif), {2} skipped ({3})";
+    public override string StatusErrorFormat => "Error: {0}";
 
-    public override string ProgressTitle => "Progress & Statistics";
-    public override string CurrentProcessingFileLabel => "Current File:";
-    public override string StatTotal => "Total";
+    public override string ProgressAndStatsTitle => "Progress & Statistics";
+    public override string ProcessingFileLabel => "Processing:";
+    public override string FallbackNoticeFormat => "💡 Note: {0} file(s) had no Exif metadata; date was inferred from filename or timestamp.";
+    public override string FallbackProgressNoticeFormat => "💡 Note: {0} file(s) are missing Exif; inferring date from filename or timestamp.";
+    public override string StatTotal => "Total Found";
     public override string StatCopied => "Copied";
-    public override string StatFallback => "No Exif";
-    public override string StatFallbackToolTip => "Files organized using filename or timestamp due to missing Exif metadata";
+    public override string StatFallback => "Missing Exif";
+    public override string StatFallbackTooltip => "Number of files organized using filename or file system timestamps due to missing Exif";
     public override string StatSkipped => "Skipped";
-    public override string StatErrors => "Errors";
+    public override string StatError => "Errors";
 
-    public override string ActivityLogTitle => "Activity Log";
+    public override string LogTitle => "Activity Log";
     public override string ClearLogsButton => "Clear";
-    public override string ClearLogsToolTip => "Clear activity log";
+    public override string ClearLogsTooltip => "Clear log entries";
 
-    public override string LogLevelSuccess => "✓ Success";
-    public override string LogLevelWarning => "⚠ Warning";
-    public override string LogLevelError => "✕ Error";
-    public override string LogLevelInfo => "ℹ Info";
+    public override string BadgeSuccess => "✓ Success";
+    public override string BadgeWarning => "⚠ Warning";
+    public override string BadgeError => "✕ Error";
+    public override string BadgeInfo => "ℹ Info";
 
-    public override string ReadyStatus => "Ready: Please select a source and destination folder.";
-    public override string SourceFolderNotFound => "Error: Source folder does not exist.";
-    public override string SourceFolderSetFormat(string folder) => $"Source folder set: {folder}";
-    public override string DestinationFolderSetFormat(string folder) => $"Destination folder set: {folder}";
-    public override string StartOrganizingProcess => "Starting organization process...";
-    public override string OperationCancelled => "Operation cancelled.";
-    public override string RequestingCancellation => "Requesting cancellation...";
-    public override string CancellationRequestedByUser => "Cancellation requested by user.";
-    public override string ErrorFormat(string message) => $"Error: {message}";
-    public override string ExceptionErrorFormat(string message) => $"Exception: {message}";
-    public override string FallbackNoticeFormat(int count) => $"💡 Notice: {count} file(s) had no Exif metadata and were determined from filenames or timestamps.";
-    public override string FallbackNoticeProgressFormat(int count) => $"💡 Notice: {count} file(s) missing Exif; determining from filenames or timestamps.";
-    public override string OrganizeCompleteWithFallbackFormat(int copied, int fallback, int skipped, TimeSpan duration) =>
-        $"Complete: {copied} copied ({fallback} without Exif), {skipped} skipped ({duration:mm\\:ss})";
-    public override string OrganizeCompleteStandardFormat(int copied, int skipped, int errors, TimeSpan duration) =>
-        $"Complete: {copied} copied, {skipped} skipped, {errors} errors ({duration:mm\\:ss})";
-    public override string CannotOpenFolderFormat(string message) => $"Could not open folder: {message}";
-    public override string SettingsImportedFormat(string path) => $"Settings imported: {path}";
-    public override string SettingsImportedSummaryFormat(string fileName) => $"Settings imported ({fileName})";
-    public override string SettingsImportFailedFormat(string message) => $"Failed to import settings: {message}";
-    public override string SettingsExportedFormat(string path) => $"Settings exported: {path}";
-    public override string SettingsExportedSummaryFormat(string fileName) => $"Settings exported ({fileName})";
-    public override string SettingsExportFailedFormat(string message) => $"Failed to export settings: {message}";
+    public override string LogStartOrganizing => "Starting organization process...";
+    public override string LogSourceSetFormat => "Source folder set: {0}";
+    public override string LogDestinationSetFormat => "Destination folder set: {0}";
+    public override string LogSettingsImportedFormat => "Settings imported: {0}";
+    public override string LogSettingsExportedFormat => "Settings exported: {0}";
+    public override string LogSettingsImportErrorFormat => "Failed to import settings: {0}";
+    public override string LogSettingsExportErrorFormat => "Failed to export settings: {0}";
+    public override string LogErrorSourceNotExist => "Error: Source folder does not exist.";
+    public override string JsonFileFilterName => "JSON Files (*.json)";
 
-    public override string ScanningFilesStatus => "Scanning files...";
-    public override string ScanningStartLog(string directory) => $"Scan started: {directory}";
-    public override string ScanCompletedStatus(int count) => $"Scan completed: {count} file(s) found";
-    public override string ScanDetectedLog(int count) => $"Detected {count} target photo/video file(s).";
-    public override string SkipCloudOnlyStatus(string fileName) => $"Skipped: {fileName} (OneDrive/Cloud-only file)";
-    public override string SkipCloudOnlyLog(string fileName) => $"[Skipped] Cloud-only file skipped (not downloaded locally): {fileName}";
-    public override string DownloadingCloudFileStatus(string fileName) => $"Downloading: {fileName} (Fetching from cloud...)";
-    public override string DownloadingCloudFileLog(string fileName) => $"[Downloading] Downloading cloud-only file: {fileName}";
-    public override string DownloadCloudFileFailedStatus(string fileName) => $"Error: {fileName} (Download failed)";
-    public override string DownloadCloudFileFailedLog(string fileName) => $"[Error] {fileName}: Failed to download from cloud.";
-    public override string SkipDuplicateStatus(string fileName) => $"Skipped: {fileName} (Identical file already exists)";
-    public override string SkipDuplicateLog(string fileName, string relativePath) => $"[Skipped] Identical file already exists: {fileName} -> {relativePath}";
-    public override string CopyCompleteStatus(string fileName) => $"Copy complete: {fileName}";
-    public override string CopyLog(string fileName, string relativePath, string note) => $"[Copied] {fileName} -> {relativePath}{note}";
-    public override string ErrorCloudAccessLog(string fileName) => $"[Error] {fileName}: Failed to access OneDrive/cloud-only file. It may not be downloaded or synchronization may be paused.";
-    public override string ErrorGeneralLog(string fileName, string message) => $"[Error] {fileName}: {message}";
+    public override string StatusScanning => "Scanning files...";
+    public override string LogScanningStartedFormat => "Scan started: {0}";
+    public override string StatusScanCompletedFormat => "Scan completed: Found {0} target file(s)";
+    public override string LogScanCompletedFormat => "Detected {0} photo/video file(s).";
+    public override string StatusCloudSkipFormat => "Skipped: {0} (Cloud-only file)";
+    public override string LogCloudSkipFormat => "[Skip] Skipped cloud-only file (not downloaded locally): {0}";
+    public override string StatusDownloadingFormat => "Downloading: {0} (fetching from cloud...)";
+    public override string LogDownloadingFormat => "[Downloading] Fetching cloud-only file on demand: {0}";
+    public override string StatusDownloadErrorFormat => "Error: {0} (Download failed)";
+    public override string LogDownloadErrorFormat => "[Error] {0}: Failed to download from cloud.";
+    public override string StatusDuplicateSkipFormat => "Skipped: {0} (Identical file already exists)";
+    public override string LogDuplicateSkipFormat => "[Skip] Identical file already exists: {0} -> {1}";
+    public override string StatusCopiedFormat => "Copied: {0}";
+    public override string LogCopiedFormat => "[Copy] {0} -> {1}{2}";
+    public override string NoteExifFormat => " (Exif: {0:yyyy-MM-dd HH:mm:ss})";
+    public override string NoteVideoFormat => " (Video metadata: {0:yyyy-MM-dd HH:mm:ss})";
+    public override string NoteFilenameFallbackFormat => " (💡 Missing Exif: Inferred {0:yyyy-MM-dd} from filename)";
+    public override string NoteModifiedFallbackFormat => " (⚠ Missing Exif: Used file modified date {0:yyyy-MM-dd})";
+    public override string NoteCreationFallbackFormat => " (⚠ Missing Exif: Used file creation date {0:yyyy-MM-dd})";
+    public override string LogCloudAccessErrorFormat => "[Error] {0}: Failed to access cloud-only file. It may not be downloaded locally or sync is paused.";
+    public override string LogGenericErrorFormat => "[Error] {0}: {1}";
+    public override string LogCompletionSummaryFormat => "Completed: Total {0} file(s) (Copied: {1}, Skipped: {2}, Errors: {3}) Duration: {4}";
+    public override string LogCompletionSummaryWithFallbackFormat => "Completed: Total {0} file(s) (Copied: {1}, Skipped: {2}, Errors: {3}) *{4} missing Exif; inferred from filename/date Duration: {5}";
 
-    public override string NoteExif(DateTime date) => $" (Exif: {date:yyyy-MM-dd HH:mm:ss})";
-    public override string NoteQuickTime(DateTime date) => $" (Video Metadata: {date:yyyy-MM-dd HH:mm:ss})";
-    public override string NoteFilenamePattern(DateTime date) => $" (💡 No Exif: estimated \"{date:yyyy-MM-dd}\" from filename)";
-    public override string NoteFileModified(DateTime date) => $" (⚠ No Exif: used modified date {date:yyyy-MM-dd})";
-    public override string NoteFileCreated(DateTime date) => $" (⚠ No Exif: used created date {date:yyyy-MM-dd})";
-
-    public override string DisclaimerDialogTitle => "⚠️ Terms of Use & Disclaimer";
-    public override string DisclaimerAgreeButton => "Agree and Continue";
-    public override string DisclaimerDisagreeButton => "Disagree (Exit)";
-    public override string DisclaimerCautionBanner => "Please carefully review the following terms of use and disclaimer before using this software.";
-    public override string DisclaimerItem1Title => "1. Source File Retention & User Responsibility";
-    public override string DisclaimerItem1Desc => "This application copies photos and videos into date-based folders and will never delete, move, or modify source (original) files. However, please be cautious to avoid accidental file deletion when you manually clean up or organize original files after processing.";
-    public override string DisclaimerItem2Title => "2. No Warranty (AS-IS)";
-    public override string DisclaimerItem2Desc => "This software is provided \"AS-IS\" without warranty of any kind, express or implied, including but not limited to accuracy, completeness, or fitness for a particular purpose.";
-    public override string DisclaimerItem3Title => "3. Preliminary Testing";
-    public override string DisclaimerItem3Desc => "Before running this tool on important production data or large folders, always test on a safe sample directory to verify copying and date classification behavior.";
-    public override string DisclaimerItem4Title => "4. Metadata & Date Identification";
-    public override string DisclaimerItem4Desc => "When Exif or QuickTime metadata is absent or damaged, file system timestamps (created date, etc.) are used as fallback. Downloaded social media images or edited videos may not reflect the original shooting date.";
-    public override string DisclaimerItem5Title => "5. Cloud-Only Files (OneDrive, etc.) & Network Usage";
-    public override string DisclaimerItem5Desc => "Processing online-only (not locally downloaded) files from OneDrive or SharePoint will automatically trigger downloads over the network. Be mindful of data consumption on metered connections (can be skipped in settings).";
+    public override string DisclaimerDialogTitle => "⚠️ Notice and Disclaimer";
+    public override string DisclaimerAcceptButton => "Accept and Start";
+    public override string DisclaimerDeclineButton => "Decline (Exit)";
+    public override string DisclaimerCautionBanner => "Please review the following terms and disclaimer carefully before using this software.";
+    public override string DisclaimerItem1Title => "1. Original File Preservation & User Deletion Caution";
+    public override string DisclaimerItem1Body => "This app copies photos and videos into date folders. It NEVER deletes, moves, or alters files in the source folder. Please exercise caution if you choose to manually delete or clean up original files after organization.";
+    public override string DisclaimerItem2Title => "2. AS-IS Warranty Disclaimer";
+    public override string DisclaimerItem2Body => "This software is provided 'AS-IS', without warranty of any kind, express or implied, including but not limited to the warranties of merchantability or fitness for a particular purpose.";
+    public override string DisclaimerItem3Title => "3. Prior Testing Required";
+    public override string DisclaimerItem3Body => "Before running on critical production folders or large libraries, always test on a small sample directory to verify copying and organization behavior.";
+    public override string DisclaimerItem4Title => "4. Metadata & Date Inferences";
+    public override string DisclaimerItem4Body => "If Exif or QuickTime metadata is missing or corrupted, file system creation/modification timestamps will be used. Social media downloads or edited media may not reflect original capture dates.";
+    public override string DisclaimerItem5Title => "5. Cloud-Only Files (OneDrive) & Bandwidth Notice";
+    public override string DisclaimerItem5Body => "When organizing online-only cloud files, network bandwidth will be consumed to download them. Please check your data plan or use the skip option if on metered connections.";
     public override string DisclaimerItem6Title => "6. Limitation of Liability";
-    public override string DisclaimerItem6Desc => "The developer assumes no liability for any direct, indirect, incidental, or consequential damages (including data loss, corruption, business interruption, or profit loss) resulting from the use of this software. Users are solely responsible for maintaining their own backups.";
-
-    public override string JsonFilePickerFilterName => "JSON Files (*.json)";
-}
-
-/// <summary>
-/// 多言語管理シングルトンサービス
-/// WindowsのUIカルチャー（CultureInfo.CurrentUICulture）から自動判定し、適切な言語リソースを提供します。
-/// </summary>
-public sealed class LocalizationService : INotifyPropertyChanged
-{
-    private static readonly Lazy<LocalizationService> _instance = new(() => new LocalizationService());
-    public static LocalizationService Current => _instance.Value;
-
-    private AppLanguage _currentLanguage = AppLanguage.Auto;
-    private AppStrings _strings;
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    public LocalizationService()
-    {
-        _strings = ResolveStrings(AppLanguage.Auto);
-    }
-
-    public AppLanguage Language
-    {
-        get => _currentLanguage;
-        set
-        {
-            if (_currentLanguage != value)
-            {
-                _currentLanguage = value;
-                _strings = ResolveStrings(value);
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(Strings));
-                OnPropertyChanged(nameof(IsJapanese));
-                OnPropertyChanged(nameof(IsEnglish));
-            }
-        }
-    }
-
-    public AppStrings Strings => _strings;
-
-    public bool IsJapanese => _strings is JapaneseStrings;
-    public bool IsEnglish => _strings is EnglishStrings;
-
-    /// <summary>
-    /// OSのカルチャーまたは指定言語設定から文字列リソースを解決します。
-    /// </summary>
-    public static AppStrings ResolveStrings(AppLanguage language, CultureInfo? culture = null)
-    {
-        if (language == AppLanguage.Japanese)
-        {
-            return new JapaneseStrings();
-        }
-
-        if (language == AppLanguage.English)
-        {
-            return new EnglishStrings();
-        }
-
-        // Auto: OSのUIカルチャーを判定
-        var uiCulture = culture ?? CultureInfo.CurrentUICulture;
-        if (uiCulture.Name.StartsWith("ja", StringComparison.OrdinalIgnoreCase) ||
-            uiCulture.TwoLetterISOLanguageName.Equals("ja", StringComparison.OrdinalIgnoreCase))
-        {
-            return new JapaneseStrings();
-        }
-
-        // 日本語以外は英語をデフォルト適用
-        return new EnglishStrings();
-    }
-
-    /// <summary>
-    /// 文字列（"ja", "en", "auto", "japanese", "english" 等）から AppLanguage を安全に解析します。
-    /// </summary>
-    public static AppLanguage ParseLanguage(string? langStr)
-    {
-        if (string.IsNullOrWhiteSpace(langStr)) return AppLanguage.Auto;
-
-        var normalized = langStr.Trim().ToLowerInvariant();
-        return normalized switch
-        {
-            "en" or "english" => AppLanguage.English,
-            "ja" or "japanese" => AppLanguage.Japanese,
-            "auto" => AppLanguage.Auto,
-            _ => Enum.TryParse<AppLanguage>(langStr, true, out var lang) ? lang : AppLanguage.Auto
-        };
-    }
-
-    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
+    public override string DisclaimerItem6Body => "The developer shall not be liable for any direct, indirect, or incidental damages (including data loss, corruption, or interruption) arising from the use or inability to use this software.";
 }

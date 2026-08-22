@@ -25,6 +25,7 @@
     <Compile Include="..\Services\LocalizationService.cs" Link="Services\LocalizationService.cs" />
     <Compile Include="..\Services\PhotoOrganizerService.cs" Link="Services\PhotoOrganizerService.cs" />
     <Compile Include="..\Services\SettingsService.cs" Link="Services\SettingsService.cs" />
+    <Compile Include="..\Services\LocalizationService.cs" Link="Services\LocalizationService.cs" />
   </ItemGroup>
 
 

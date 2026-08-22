@@ -16,10 +16,11 @@ public partial class MainViewModel : ObservableObject
     private readonly IPhotoOrganizerService _organizerService;
     private CancellationTokenSource? _cancellationTokenSource;
 
+    public Strings Strings => LocalizationService.Strings;
+
     public string AppVersion => typeof(MainViewModel).Assembly.GetName().Version?.ToString() ?? "1.0.0.0";
     public string AppVersionDisplay => $"v{AppVersion}";
 
-    public AppStrings Strings => LocalizationService.Current.Strings;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(StartOrganizingCommand))]
@@ -101,7 +102,7 @@ public partial class MainViewModel : ObservableObject
     private string _currentFile = string.Empty;
 
     [ObservableProperty]
-    private string _statusMessage = LocalizationService.Current.Strings.ReadyStatus;
+    private string _statusMessage = LocalizationService.Strings.StatusReady;
 
     [ObservableProperty]
     private int _totalFiles;
@@ -136,10 +137,7 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel(IPhotoOrganizerService organizerService)
     {
         _organizerService = organizerService;
-        LocalizationService.Current.PropertyChanged += (_, _) =>
-        {
-            OnPropertyChanged(nameof(Strings));
-        };
+        _statusMessage = Strings.StatusReady;
     }
 
     public MainViewModel() : this(new PhotoOrganizerService())
@@ -163,7 +161,7 @@ public partial class MainViewModel : ObservableObject
             if (!string.IsNullOrEmpty(folder))
             {
                 SourceDirectory = folder;
-                AddLog(LogLevel.Info, Strings.SourceFolderSetFormat(folder));
+                AddLog(LogLevel.Info, string.Format(Strings.LogSourceSetFormat, folder));
             }
         }
     }
@@ -177,7 +175,7 @@ public partial class MainViewModel : ObservableObject
             if (!string.IsNullOrEmpty(folder))
             {
                 DestinationDirectory = folder;
-                AddLog(LogLevel.Info, Strings.DestinationFolderSetFormat(folder));
+                AddLog(LogLevel.Info, string.Format(Strings.LogDestinationSetFormat, folder));
             }
         }
     }
@@ -187,7 +185,7 @@ public partial class MainViewModel : ObservableObject
     {
         if (!Directory.Exists(SourceDirectory))
         {
-            AddLog(LogLevel.Error, Strings.SourceFolderNotFound);
+            AddLog(LogLevel.Error, Strings.LogErrorSourceNotExist);
             return;
         }
 
@@ -212,7 +210,7 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            AddLog(LogLevel.Info, Strings.StartOrganizingProcess);
+            AddLog(LogLevel.Info, Strings.LogStartOrganizing);
             var sourceDir = SourceDirectory;
             var destDir = DestinationDirectory;
             var cloudMode = CloudFileMode;
@@ -225,38 +223,36 @@ public partial class MainViewModel : ObservableObject
                 token,
                 cloudMode), token);
 
-
-
             if (result.IsCancelled)
             {
-                StatusMessage = Strings.OperationCancelled;
+                StatusMessage = Strings.StatusCancelled;
             }
             else if (!string.IsNullOrEmpty(result.ErrorMessage))
             {
-                StatusMessage = Strings.ErrorFormat(result.ErrorMessage);
+                StatusMessage = string.Format(Strings.StatusErrorFormat, result.ErrorMessage);
             }
             else
             {
                 if (result.FallbackCount > 0)
                 {
                     HasFallbackFiles = true;
-                    FallbackNoticeMessage = Strings.FallbackNoticeFormat(result.FallbackCount);
-                    StatusMessage = Strings.OrganizeCompleteWithFallbackFormat(result.CopiedCount, result.FallbackCount, result.SkippedCount, result.Duration);
+                    FallbackNoticeMessage = string.Format(Strings.FallbackNoticeFormat, result.FallbackCount);
+                    StatusMessage = string.Format(Strings.StatusCompletedWithFallbackFormat, result.CopiedCount, result.FallbackCount, result.SkippedCount, result.Duration.ToString(@"mm\:ss"));
                 }
                 else
                 {
-                    StatusMessage = Strings.OrganizeCompleteStandardFormat(result.CopiedCount, result.SkippedCount, result.ErrorCount, result.Duration);
+                    StatusMessage = string.Format(Strings.StatusCompletedFormat, result.CopiedCount, result.SkippedCount, result.ErrorCount, result.Duration.ToString(@"mm\:ss"));
                 }
             }
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = Strings.OperationCancelled;
+            StatusMessage = Strings.StatusCancelled;
         }
         catch (Exception ex)
         {
-            StatusMessage = Strings.ErrorFormat(ex.Message);
-            AddLog(LogLevel.Error, Strings.ExceptionErrorFormat(ex.Message));
+            StatusMessage = string.Format(Strings.StatusErrorFormat, ex.Message);
+            AddLog(LogLevel.Error, string.Format(Strings.StatusErrorFormat, ex.Message));
         }
         finally
         {
@@ -272,8 +268,8 @@ public partial class MainViewModel : ObservableObject
     {
         if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
         {
-            StatusMessage = Strings.RequestingCancellation;
-            AddLog(LogLevel.Warning, Strings.CancellationRequestedByUser);
+            StatusMessage = Strings.StatusCancelled;
+            AddLog(LogLevel.Warning, Strings.StatusCancelled);
             _cancellationTokenSource.Cancel();
         }
     }
@@ -299,7 +295,7 @@ public partial class MainViewModel : ObservableObject
             }
             catch (Exception ex)
             {
-                AddLog(LogLevel.Error, Strings.CannotOpenFolderFormat(ex.Message));
+                AddLog(LogLevel.Error, string.Format(Strings.StatusErrorFormat, ex.Message));
             }
         }
     }
@@ -327,13 +323,13 @@ public partial class MainViewModel : ObservableObject
             }
             SkipCloudOnlyFiles = settings.SkipCloudOnlyFiles;
 
-            AddLog(LogLevel.Info, Strings.SettingsImportedFormat(filePath));
-            StatusMessage = Strings.SettingsImportedSummaryFormat(Path.GetFileName(filePath));
+            AddLog(LogLevel.Info, string.Format(Strings.LogSettingsImportedFormat, filePath));
+            StatusMessage = string.Format(Strings.LogSettingsImportedFormat, Path.GetFileName(filePath));
         }
         catch (Exception ex)
         {
-            AddLog(LogLevel.Error, Strings.SettingsImportFailedFormat(ex.Message));
-            StatusMessage = Strings.ErrorFormat(ex.Message);
+            AddLog(LogLevel.Error, string.Format(Strings.LogSettingsImportErrorFormat, ex.Message));
+            StatusMessage = string.Format(Strings.LogSettingsImportErrorFormat, ex.Message);
         }
     }
 
@@ -355,13 +351,13 @@ public partial class MainViewModel : ObservableObject
 
             settingsService.ExportSettings(filePath, currentSettings);
 
-            AddLog(LogLevel.Info, Strings.SettingsExportedFormat(filePath));
-            StatusMessage = Strings.SettingsExportedSummaryFormat(Path.GetFileName(filePath));
+            AddLog(LogLevel.Info, string.Format(Strings.LogSettingsExportedFormat, filePath));
+            StatusMessage = string.Format(Strings.LogSettingsExportedFormat, Path.GetFileName(filePath));
         }
         catch (Exception ex)
         {
-            AddLog(LogLevel.Error, Strings.SettingsExportFailedFormat(ex.Message));
-            StatusMessage = Strings.ErrorFormat(ex.Message);
+            AddLog(LogLevel.Error, string.Format(Strings.LogSettingsExportErrorFormat, ex.Message));
+            StatusMessage = string.Format(Strings.LogSettingsExportErrorFormat, ex.Message);
         }
     }
 
@@ -394,7 +390,7 @@ public partial class MainViewModel : ObservableObject
         if (p.FallbackCount > 0)
         {
             HasFallbackFiles = true;
-            FallbackNoticeMessage = Strings.FallbackNoticeProgressFormat(p.FallbackCount);
+            FallbackNoticeMessage = string.Format(Strings.FallbackProgressNoticeFormat, p.FallbackCount);
         }
 
         if (!string.IsNullOrEmpty(p.CurrentFilePath))

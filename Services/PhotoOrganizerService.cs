@@ -161,19 +161,19 @@ public class PhotoOrganizerService : IPhotoOrganizerService
         CancellationToken cancellationToken,
         CloudFileHandlingMode cloudFileMode)
     {
+        var strings = LocalizationService.Strings;
         var stopwatch = Stopwatch.StartNew();
         int copiedCount = 0;
         int skippedCount = 0;
         int errorCount = 0;
         int fallbackCount = 0;
 
-        var strings = LocalizationService.Current.Strings;
 
         try
         {
             if (!System.IO.Directory.Exists(sourceDirectory))
             {
-                throw new DirectoryNotFoundException($"{strings.SourceFolderNotFound}: {sourceDirectory}");
+                throw new DirectoryNotFoundException($"{strings.LogErrorSourceNotExist}: {sourceDirectory}");
             }
 
             if (!System.IO.Directory.Exists(destinationDirectory))
@@ -185,11 +185,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
             progress.Report(new OrganizeProgress
             {
                 Phase = OrganizePhase.Scanning,
-                StatusMessage = strings.ScanningFilesStatus,
+                StatusMessage = strings.StatusScanning,
                 NewLogEntry = new LogEntry
                 {
                     Level = LogLevel.Info,
-                    Message = strings.ScanningStartLog(sourceDirectory)
+                    Message = string.Format(strings.LogScanningStartedFormat, sourceDirectory)
                 }
             });
 
@@ -207,11 +207,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 Phase = OrganizePhase.Organizing,
                 TotalCount = totalFiles,
                 ProcessedCount = 0,
-                StatusMessage = strings.ScanCompletedStatus(totalFiles),
+                StatusMessage = string.Format(strings.StatusScanCompletedFormat, totalFiles),
                 NewLogEntry = new LogEntry
                 {
                     Level = LogLevel.Info,
-                    Message = strings.ScanDetectedLog(totalFiles)
+                    Message = string.Format(strings.LogScanCompletedFormat, totalFiles)
                 }
             });
 
@@ -239,7 +239,6 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 var fileName = Path.GetFileName(sourceFile);
                 int currentIndex = i + 1;
 
-
                 try
                 {
                     // 0. クラウド専用ファイル（未ダウンロード）の事前チェックと必要に応じた一時ダウンロード
@@ -260,11 +259,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                                 ErrorCount = errorCount,
                                 FallbackCount = fallbackCount,
                                 CurrentFilePath = sourceFile,
-                                StatusMessage = strings.SkipCloudOnlyStatus(fileName),
+                                StatusMessage = string.Format(strings.StatusCloudSkipFormat, fileName),
                                 NewLogEntry = new LogEntry
                                 {
                                     Level = LogLevel.Warning,
-                                    Message = strings.SkipCloudOnlyLog(fileName),
+                                    Message = string.Format(strings.LogCloudSkipFormat, fileName),
                                     FilePath = sourceFile
                                 }
                             });
@@ -282,11 +281,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                             ErrorCount = errorCount,
                             FallbackCount = fallbackCount,
                             CurrentFilePath = sourceFile,
-                            StatusMessage = strings.DownloadingCloudFileStatus(fileName),
+                            StatusMessage = string.Format(strings.StatusDownloadingFormat, fileName),
                             NewLogEntry = new LogEntry
                             {
                                 Level = LogLevel.Info,
-                                Message = strings.DownloadingCloudFileLog(fileName),
+                                Message = string.Format(strings.LogDownloadingFormat, fileName),
                                 FilePath = sourceFile
                             }
                         });
@@ -305,18 +304,16 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                                 ErrorCount = errorCount,
                                 FallbackCount = fallbackCount,
                                 CurrentFilePath = sourceFile,
-                                StatusMessage = strings.DownloadCloudFileFailedStatus(fileName),
+                                StatusMessage = string.Format(strings.StatusDownloadErrorFormat, fileName),
                                 NewLogEntry = new LogEntry
                                 {
                                     Level = LogLevel.Error,
-                                    Message = strings.DownloadCloudFileFailedLog(fileName),
+                                    Message = string.Format(strings.LogDownloadErrorFormat, fileName),
                                     FilePath = sourceFile
                                 }
                             });
                             continue;
                         }
-
-
                     }
 
                     // 1. Extract Date
@@ -360,11 +357,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                             ErrorCount = errorCount,
                             FallbackCount = fallbackCount,
                             CurrentFilePath = sourceFile,
-                            StatusMessage = strings.SkipDuplicateStatus(fileName),
+                            StatusMessage = string.Format(strings.StatusDuplicateSkipFormat, fileName),
                             NewLogEntry = new LogEntry
                             {
                                 Level = LogLevel.Warning,
-                                Message = strings.SkipDuplicateLog(fileName, Path.GetRelativePath(destinationDirectory, targetFilePath)),
+                                Message = string.Format(strings.LogDuplicateSkipFormat, fileName, Path.GetRelativePath(destinationDirectory, targetFilePath)),
                                 FilePath = sourceFile
                             }
                         });
@@ -377,11 +374,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
 
                         var (logLevel, note) = dateSource switch
                         {
-                            DateSourceType.Exif => (LogLevel.Success, strings.NoteExif(captureDate)),
-                            DateSourceType.QuickTime => (LogLevel.Success, strings.NoteQuickTime(captureDate)),
-                            DateSourceType.FilenamePattern => (LogLevel.Warning, strings.NoteFilenamePattern(captureDate)),
-                            DateSourceType.FileModifiedTime => (LogLevel.Warning, strings.NoteFileModified(captureDate)),
-                            _ => (LogLevel.Warning, strings.NoteFileCreated(captureDate))
+                            DateSourceType.Exif => (LogLevel.Success, string.Format(strings.NoteExifFormat, captureDate)),
+                            DateSourceType.QuickTime => (LogLevel.Success, string.Format(strings.NoteVideoFormat, captureDate)),
+                            DateSourceType.FilenamePattern => (LogLevel.Warning, string.Format(strings.NoteFilenameFallbackFormat, captureDate)),
+                            DateSourceType.FileModifiedTime => (LogLevel.Warning, string.Format(strings.NoteModifiedFallbackFormat, captureDate)),
+                            _ => (LogLevel.Warning, string.Format(strings.NoteCreationFallbackFormat, captureDate))
                         };
 
                         progress.Report(new OrganizeProgress
@@ -394,11 +391,11 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                             ErrorCount = errorCount,
                             FallbackCount = fallbackCount,
                             CurrentFilePath = sourceFile,
-                            StatusMessage = strings.CopyCompleteStatus(fileName),
+                            StatusMessage = string.Format(strings.StatusCopiedFormat, fileName),
                             NewLogEntry = new LogEntry
                             {
                                 Level = logLevel,
-                                Message = strings.CopyLog(fileName, Path.GetRelativePath(destinationDirectory, targetFilePath), note),
+                                Message = string.Format(strings.LogCopiedFormat, fileName, Path.GetRelativePath(destinationDirectory, targetFilePath), note),
                                 FilePath = sourceFile
                             }
                         });
@@ -412,8 +409,8 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                 {
                     errorCount++;
                     string errorMsg = IsCloudFileException(ex)
-                        ? strings.ErrorCloudAccessLog(fileName)
-                        : strings.ErrorGeneralLog(fileName, ex.Message);
+                        ? string.Format(strings.LogCloudAccessErrorFormat, fileName)
+                        : string.Format(strings.LogGenericErrorFormat, fileName, ex.Message);
 
                     progress.Report(new OrganizeProgress
                     {
@@ -425,7 +422,7 @@ public class PhotoOrganizerService : IPhotoOrganizerService
                         ErrorCount = errorCount,
                         FallbackCount = fallbackCount,
                         CurrentFilePath = sourceFile,
-                        StatusMessage = strings.ErrorFormat(fileName),
+                        StatusMessage = string.Format(strings.StatusErrorFormat, fileName),
                         NewLogEntry = new LogEntry
                         {
                             Level = LogLevel.Error,
@@ -439,8 +436,8 @@ public class PhotoOrganizerService : IPhotoOrganizerService
             stopwatch.Stop();
 
             string completionSummary = fallbackCount > 0
-                ? strings.OrganizeCompleteWithFallbackFormat(copiedCount, fallbackCount, skippedCount, stopwatch.Elapsed)
-                : strings.OrganizeCompleteStandardFormat(copiedCount, skippedCount, errorCount, stopwatch.Elapsed);
+                ? string.Format(strings.LogCompletionSummaryWithFallbackFormat, totalFiles, copiedCount, skippedCount, errorCount, fallbackCount, stopwatch.Elapsed.ToString(@"mm\:ss"))
+                : string.Format(strings.LogCompletionSummaryFormat, totalFiles, copiedCount, skippedCount, errorCount, stopwatch.Elapsed.ToString(@"mm\:ss"));
 
             progress.Report(new OrganizeProgress
             {

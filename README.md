@@ -28,7 +28,10 @@ Windows デスクトップ向けのモダンな写真・動画自動整理ツー
    - **異なる内容:** `IMG_1234_1.HEIC`, `IMG_1234_2.HEIC` のように連番を付与して安全にコピー。
    - **OneDrive / SharePoint 対応:** ローカルに未ダウンロードの「オンライン専用ファイル（プレースホルダー）」を自動検出し、無駄な大量ダウンロードやアクセスエラー（`0x80070780` 等）を防いで安全にスキップ（UIで切り替え可能）。
 
-4. **モダンな WinUI 3 UI**
+4. **多言語（日本語・英語）自動切り替え対応**
+   - Windows の表示言語モード（UI Culture）を自動検出し、日本語（`ja` / `ja-JP`）または英語（`en` / `en-US`）にUIテキスト、各種ダイアログ、免責事項、通知メッセージをシームレスに切り替えます。
+
+5. **モダンな WinUI 3 UI**
    - Windows 11 の Mica 背景素材、Fluent Design、ダーク/ライトテーマ対応。
    - リアルタイムプログレスバー (`ProgressBar`)、総ファイル数/コピー数/スキップ数/エラー数の統計バッジ。
    - 処理中ファイル名表示と、種別ごとに色分けされた処理ログビュー (`ListView`)。
@@ -56,20 +59,28 @@ PhotoDateOrganizer/
 ├── PhotoDateOrganizer.csproj       # プロジェクト定義 (.NET 10 / WinUI 3 / NuGet参照)
 ├── app.manifest                    # DPI PerMonitorV2 & Windows 10/11 対応マニフェスト
 ├── App.xaml / App.xaml.cs          # アプリケーションエントリポイント
-├── MainWindow.xaml                 # メイン画面 XAML (Mica, 進捗バー, ログ, 統計)
-├── MainWindow.xaml.cs              # FolderPicker HWND 連携, ウィンドウ設定
+├── MainWindow.xaml                 # メイン画面 XAML (Mica, 進捗バー, ログ, 統計, 多言語バインディング)
+├── MainWindow.xaml.cs              # FolderPicker HWND 連携, ウィンドウ設定, 免責事項ダイアログ
 ├── Models/
+│   ├── AppSettings.cs              # 設定情報モデル (ウィンドウ位置/サイズ/免責事項同意等)
+│   ├── CloudFileHandlingMode.cs    # クラウドファイル処理モード列挙型
 │   ├── LogEntry.cs                 # 処理ログモデル (Info, Success, Warning, Error)
 │   ├── OrganizeProgress.cs         # リアルタイム進捗通知モデル
 │   └── OrganizeResult.cs           # 実行結果サマリー
 ├── Services/
+│   ├── LocalizationService.cs      # 多言語（日本語・英語）リソース管理サービス
+│   ├── CloudFileService.cs         # OneDrive/SharePoint クラウドファイル属性判定
 │   ├── IPhotoOrganizerService.cs    # 写真整理サービス インターフェース
-│   └── PhotoOrganizerService.cs     # メタデータ解析・重複衝突判定・コピーロジック
+│   ├── PhotoOrganizerService.cs     # メタデータ解析・重複衝突判定・コピーロジック
+│   └── SettingsService.cs          # 設定の保存・読み込み・インポート/エクスポート
 ├── ViewModels/
 │   └── MainViewModel.cs            # MVVM ViewModel (バインディング, コマンド, キャンセル制御)
 ├── PhotoDateOrganizer.Tests/       # xUnit 単体テストプロジェクト
 │   ├── PhotoDateOrganizer.Tests.csproj
-│   └── PhotoOrganizerServiceTests.cs
+│   ├── LocalizationServiceTests.cs # 多言語切り替え単体テスト
+│   ├── CloudFileServiceTests.cs    # クラウドファイル判定単体テスト
+│   ├── PhotoOrganizerServiceTests.cs # 写真整理・Exif解析単体テスト
+│   └── SettingsServiceTests.cs     # 設定保存・復元単体テスト
 └── README.md
 ```
 
@@ -102,7 +113,15 @@ dotnet test PhotoDateOrganizer.Tests\PhotoDateOrganizer.Tests.csproj
 dotnet run
 ```
 
-### 5. 配布用自己完結型パッケージのパブリッシュ
+### 5. Microsoft Store 向け MSIX パッケージのビルド (x64 / Arm64)
+```powershell
+# x64、Arm64、および統合バンドル (.msixbundle) を一括生成
+.\build-msix.ps1 -Version "1.0.0.0"
+```
+生成されたパッケージは `.\MSIX\` フォルダに出力されます。  
+ストア登録の全体手順は [STORE_SUBMISSION_GUIDE.md](file:///c:/Dev/PhotoDateOrganizer/STORE_SUBMISSION_GUIDE.md) をご覧ください。
+
+### 6. 配布用自己完結型パッケージのパブリッシュ
 ```powershell
 # x64 版自己完結バイナリの出力
 dotnet publish -c Release -r win-x64 --self-contained

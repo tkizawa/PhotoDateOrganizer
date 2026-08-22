@@ -1,4 +1,3 @@
-using System;
 using System.Globalization;
 using PhotoDateOrganizer.Services;
 using Xunit;
@@ -8,140 +7,68 @@ namespace PhotoDateOrganizer.Tests;
 public class LocalizationServiceTests
 {
     [Fact]
-    public void ResolveStrings_ExplicitJapanese_ReturnsJapaneseStrings()
+    public void JapaneseStrings_ReturnsExpectedJapaneseText()
     {
-        var strings = LocalizationService.ResolveStrings(AppLanguage.Japanese);
-        Assert.IsType<JapaneseStrings>(strings);
-        Assert.Contains("写真", strings.AppTitle);
+        var service = new LocalizationService();
+        service.SetCulture(new CultureInfo("ja-JP"));
+
+        Assert.True(service.IsJapanese);
+        Assert.IsType<JapaneseStrings>(service.CurrentStrings);
+        Assert.Equal("フォルダ設定", service.CurrentStrings.FolderSetupTitle);
+        Assert.Equal("整理を開始する", service.CurrentStrings.StartOrganizingButton);
+        Assert.Equal("キャンセル", service.CurrentStrings.CancelButton);
+        Assert.Contains("準備完了", service.CurrentStrings.StatusReady);
+        Assert.Contains("免責事項", service.CurrentStrings.DisclaimerDialogTitle);
+        Assert.Equal("同意して利用を開始する", service.CurrentStrings.DisclaimerAcceptButton);
+        Assert.Equal("総検出数", service.CurrentStrings.StatTotal);
     }
 
     [Fact]
-    public void ResolveStrings_ExplicitEnglish_ReturnsEnglishStrings()
+    public void EnglishStrings_ReturnsExpectedEnglishText()
     {
-        var strings = LocalizationService.ResolveStrings(AppLanguage.English);
-        Assert.IsType<EnglishStrings>(strings);
-        Assert.Contains("Organize", strings.AppTitle);
+        var service = new LocalizationService();
+        service.SetCulture(new CultureInfo("en-US"));
+
+        Assert.False(service.IsJapanese);
+        Assert.IsType<EnglishStrings>(service.CurrentStrings);
+        Assert.Equal("Folder Setup", service.CurrentStrings.FolderSetupTitle);
+        Assert.Equal("Start Organizing", service.CurrentStrings.StartOrganizingButton);
+        Assert.Equal("Cancel", service.CurrentStrings.CancelButton);
+        Assert.Contains("Ready", service.CurrentStrings.StatusReady);
+        Assert.Contains("Disclaimer", service.CurrentStrings.DisclaimerDialogTitle);
+        Assert.Equal("Accept and Start", service.CurrentStrings.DisclaimerAcceptButton);
+        Assert.Equal("Total Found", service.CurrentStrings.StatTotal);
     }
 
     [Fact]
-    public void ResolveStrings_AutoWithJapaneseCulture_ReturnsJapaneseStrings()
-    {
-        var jaCulture = new CultureInfo("ja-JP");
-        var strings = LocalizationService.ResolveStrings(AppLanguage.Auto, jaCulture);
-        Assert.IsType<JapaneseStrings>(strings);
-        Assert.Equal("整理を開始する", strings.StartButton);
-    }
-
-    [Fact]
-    public void ResolveStrings_AutoWithEnglishCulture_ReturnsEnglishStrings()
-    {
-        var enCulture = new CultureInfo("en-US");
-        var strings = LocalizationService.ResolveStrings(AppLanguage.Auto, enCulture);
-        Assert.IsType<EnglishStrings>(strings);
-        Assert.Equal("Start Organizing", strings.StartButton);
-    }
-
-    [Fact]
-    public void ResolveStrings_AutoWithOtherCulture_FallsBackToEnglishStrings()
-    {
-        var frCulture = new CultureInfo("fr-FR");
-        var strings = LocalizationService.ResolveStrings(AppLanguage.Auto, frCulture);
-        Assert.IsType<EnglishStrings>(strings);
-        Assert.Equal("Start Organizing", strings.StartButton);
-    }
-
-    [Theory]
-    [InlineData("ja", AppLanguage.Japanese)]
-    [InlineData("japanese", AppLanguage.Japanese)]
-    [InlineData("Japanese", AppLanguage.Japanese)]
-    [InlineData("en", AppLanguage.English)]
-    [InlineData("english", AppLanguage.English)]
-    [InlineData("English", AppLanguage.English)]
-    [InlineData("auto", AppLanguage.Auto)]
-    [InlineData("Auto", AppLanguage.Auto)]
-    [InlineData("", AppLanguage.Auto)]
-    [InlineData(null, AppLanguage.Auto)]
-    [InlineData("unknown", AppLanguage.Auto)]
-    public void ParseLanguage_ReturnsExpectedAppLanguage(string? input, AppLanguage expected)
-    {
-        var result = LocalizationService.ParseLanguage(input);
-        Assert.Equal(expected, result);
-    }
-
-    [Fact]
-    public void JapaneseStrings_FormattedMethods_ReturnValidStrings()
+    public void AllDisclaimerItems_AreNonEmpty_InBothLanguages()
     {
         var ja = new JapaneseStrings();
-        var dt = new DateTime(2023, 5, 12, 14, 30, 0);
+        Assert.False(string.IsNullOrWhiteSpace(ja.DisclaimerItem1Title));
+        Assert.False(string.IsNullOrWhiteSpace(ja.DisclaimerItem1Body));
+        Assert.False(string.IsNullOrWhiteSpace(ja.DisclaimerItem2Title));
+        Assert.False(string.IsNullOrWhiteSpace(ja.DisclaimerItem2Body));
+        Assert.False(string.IsNullOrWhiteSpace(ja.DisclaimerItem3Title));
+        Assert.False(string.IsNullOrWhiteSpace(ja.DisclaimerItem3Body));
+        Assert.False(string.IsNullOrWhiteSpace(ja.DisclaimerItem4Title));
+        Assert.False(string.IsNullOrWhiteSpace(ja.DisclaimerItem4Body));
+        Assert.False(string.IsNullOrWhiteSpace(ja.DisclaimerItem5Title));
+        Assert.False(string.IsNullOrWhiteSpace(ja.DisclaimerItem5Body));
+        Assert.False(string.IsNullOrWhiteSpace(ja.DisclaimerItem6Title));
+        Assert.False(string.IsNullOrWhiteSpace(ja.DisclaimerItem6Body));
 
-        Assert.Contains("C:\\Test", ja.SourceFolderSetFormat("C:\\Test"));
-        Assert.Contains("D:\\Output", ja.DestinationFolderSetFormat("D:\\Output"));
-        Assert.Contains("5", ja.FallbackNoticeFormat(5));
-        Assert.Contains("10", ja.OrganizeCompleteWithFallbackFormat(10, 2, 1, TimeSpan.FromSeconds(5)));
-        Assert.Contains("2023-05-12", ja.NoteExif(dt));
-        Assert.Contains("2023-05-12", ja.NoteQuickTime(dt));
-        Assert.Contains("2023-05-12", ja.NoteFilenamePattern(dt));
-        Assert.NotEmpty(ja.DisclaimerDialogTitle);
-        Assert.NotEmpty(ja.DisclaimerItem1Title);
-        Assert.NotEmpty(ja.DisclaimerItem1Desc);
-        Assert.NotEmpty(ja.DisclaimerItem6Title);
-        Assert.NotEmpty(ja.DisclaimerItem6Desc);
-    }
-
-    [Fact]
-    public void EnglishStrings_FormattedMethods_ReturnValidStrings()
-    {
         var en = new EnglishStrings();
-        var dt = new DateTime(2023, 5, 12, 14, 30, 0);
-
-        Assert.Contains("C:\\Test", en.SourceFolderSetFormat("C:\\Test"));
-        Assert.Contains("D:\\Output", en.DestinationFolderSetFormat("D:\\Output"));
-        Assert.Contains("5", en.FallbackNoticeFormat(5));
-        Assert.Contains("10", en.OrganizeCompleteWithFallbackFormat(10, 2, 1, TimeSpan.FromSeconds(5)));
-        Assert.Contains("2023-05-12", en.NoteExif(dt));
-        Assert.Contains("2023-05-12", en.NoteQuickTime(dt));
-        Assert.Contains("2023-05-12", en.NoteFilenamePattern(dt));
-        Assert.NotEmpty(en.DisclaimerDialogTitle);
-        Assert.NotEmpty(en.DisclaimerItem1Title);
-        Assert.NotEmpty(en.DisclaimerItem1Desc);
-        Assert.NotEmpty(en.DisclaimerItem6Title);
-        Assert.NotEmpty(en.DisclaimerItem6Desc);
-    }
-
-    [Fact]
-    public void LocalizationService_LanguageSwitch_FiresPropertyChanged()
-    {
-        var service = LocalizationService.Current;
-        bool propertyChangedFired = false;
-        string? changedPropertyName = null;
-
-        void Handler(object? s, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            propertyChangedFired = true;
-            changedPropertyName = e.PropertyName;
-        }
-
-        service.PropertyChanged += Handler;
-
-        try
-        {
-            service.Language = AppLanguage.English;
-            Assert.True(propertyChangedFired);
-            Assert.Equal(AppLanguage.English, service.Language);
-            Assert.True(service.IsEnglish);
-            Assert.False(service.IsJapanese);
-
-            propertyChangedFired = false;
-            service.Language = AppLanguage.Japanese;
-            Assert.True(propertyChangedFired);
-            Assert.Equal(AppLanguage.Japanese, service.Language);
-            Assert.True(service.IsJapanese);
-            Assert.False(service.IsEnglish);
-        }
-        finally
-        {
-            service.PropertyChanged -= Handler;
-            service.Language = AppLanguage.Auto;
-        }
+        Assert.False(string.IsNullOrWhiteSpace(en.DisclaimerItem1Title));
+        Assert.False(string.IsNullOrWhiteSpace(en.DisclaimerItem1Body));
+        Assert.False(string.IsNullOrWhiteSpace(en.DisclaimerItem2Title));
+        Assert.False(string.IsNullOrWhiteSpace(en.DisclaimerItem2Body));
+        Assert.False(string.IsNullOrWhiteSpace(en.DisclaimerItem3Title));
+        Assert.False(string.IsNullOrWhiteSpace(en.DisclaimerItem3Body));
+        Assert.False(string.IsNullOrWhiteSpace(en.DisclaimerItem4Title));
+        Assert.False(string.IsNullOrWhiteSpace(en.DisclaimerItem4Body));
+        Assert.False(string.IsNullOrWhiteSpace(en.DisclaimerItem5Title));
+        Assert.False(string.IsNullOrWhiteSpace(en.DisclaimerItem5Body));
+        Assert.False(string.IsNullOrWhiteSpace(en.DisclaimerItem6Title));
+        Assert.False(string.IsNullOrWhiteSpace(en.DisclaimerItem6Body));
     }
 }
