@@ -113,7 +113,15 @@ dotnet test PhotoDateOrganizer.Tests\PhotoDateOrganizer.Tests.csproj
 dotnet run
 ```
 
-### 5. 配布用自己完結型パッケージのパブリッシュ
+### 5. Microsoft Store 向け MSIX パッケージのビルド (x64 / Arm64)
+```powershell
+# x64、Arm64、および統合バンドル (.msixbundle) を一括生成
+.\build-msix.ps1 -Version "1.0.0.0"
+```
+生成されたパッケージは `.\MSIX\` フォルダに出力されます。  
+ストア登録の全体手順は [STORE_SUBMISSION_GUIDE.md](file:///c:/Dev/PhotoDateOrganizer/STORE_SUBMISSION_GUIDE.md) をご覧ください。
+
+### 6. 配布用自己完結型パッケージのパブリッシュ
 ```powershell
 # x64 版自己完結バイナリの出力
 dotnet publish -c Release -r win-x64 --self-contained
