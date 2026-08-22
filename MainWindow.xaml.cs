@@ -48,7 +48,7 @@ public sealed partial class MainWindow : Window
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         // アプリバージョンを含むウィンドウタイトルを設定
-        this.Title = $"PhotoDateOrganizer {ViewModel.AppVersionDisplay} - 写真・動画撮影日時自動整理";
+        this.Title = string.Format(LocalizationService.Strings.WindowTitleFormat, ViewModel.AppVersionDisplay);
 
         // ウィンドウアイコンの設定
         try
@@ -147,11 +147,13 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        var s = LocalizationService.Strings;
+
         var dialog = new ContentDialog
         {
-            Title = "⚠️ ご利用上の注意事項・免責事項 (Disclaimer)",
-            PrimaryButtonText = "同意して利用を開始する",
-            CloseButtonText = "同意しない (終了)",
+            Title = s.DisclaimerDialogTitle,
+            PrimaryButtonText = s.DisclaimerAcceptButton,
+            CloseButtonText = s.DisclaimerDeclineButton,
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = this.Content.XamlRoot
         };
@@ -193,7 +195,7 @@ public sealed partial class MainWindow : Window
 
         var cautionText = new TextBlock
         {
-            Text = "本ソフトウェアをご利用いただく前に、以下の注意事項および免責事項を必ずご確認ください。",
+            Text = s.DisclaimerCautionBanner,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             TextWrapping = TextWrapping.Wrap,
             VerticalAlignment = VerticalAlignment.Center
@@ -210,29 +212,12 @@ public sealed partial class MainWindow : Window
             Spacing = 12
         };
 
-        itemsStack.Children.Add(CreateDisclaimerItem(
-            "1. 原本ファイルの保持とユーザーによる整理・削除の注意",
-            "本アプリは写真・動画ファイルを日付フォルダへ「コピー」するツールであり、整理元（原本）のファイルを削除・移動・変更する処理は一切行いません。ただし、本アプリによる整理完了後にユーザー自身が原本ファイルを整理・削除する際の誤削除等には十分にご注意ください。"));
-
-        itemsStack.Children.Add(CreateDisclaimerItem(
-            "2. 無保証 (AS-IS)",
-            "本ソフトウェアは現状有姿（AS-IS）で提供され、明示的・黙示的を問わず、その正確性、完全性、特定目的への適合性についていかなる保証も行いません。"));
-
-        itemsStack.Children.Add(CreateDisclaimerItem(
-            "3. 事前テストの実施",
-            "重要な本番データや大容量フォルダに適用する前に、必ず影響のないテスト用フォルダを作成し、ファイルコピーおよび日時分類の動作を十分に検証した上でご利用ください。"));
-
-        itemsStack.Children.Add(CreateDisclaimerItem(
-            "4. メタデータおよび撮影日時の判定について",
-            "Exif や QuickTime などのメタデータが存在しない場合や破損している場合は、ファイルシステムのタイムスタンプ（作成日時等）が代用されます。SNS保存画像や編集済み動画等では正確な撮影日時とならない場合があります。"));
-
-        itemsStack.Children.Add(CreateDisclaimerItem(
-            "5. クラウド専用ファイル（OneDrive等）と通信環境に関する注意",
-            "OneDrive や SharePoint などのオンライン専用（未ダウンロード）ファイルを処理対象とする場合、ネットワーク経由での自動ダウンロードが発生します。通信量や従量制課金環境にご注意ください（設定によりスキップすることも可能です）。"));
-
-        itemsStack.Children.Add(CreateDisclaimerItem(
-            "6. 免責事項 (開発者の責任について)",
-            "本ソフトウェアの使用、設定の誤り、ネットワーク障害、ファイルコピーやメタデータ解析処理等により生じたいかなる損害（データの消失、破損、業務の中断、利益の損失等を含むがこれらに限定されない）について、開発者は一切の責任を負いません。バックアップ等の安全対策は利用者自身の責任で行ってください。"));
+        itemsStack.Children.Add(CreateDisclaimerItem(s.DisclaimerItem1Title, s.DisclaimerItem1Body));
+        itemsStack.Children.Add(CreateDisclaimerItem(s.DisclaimerItem2Title, s.DisclaimerItem2Body));
+        itemsStack.Children.Add(CreateDisclaimerItem(s.DisclaimerItem3Title, s.DisclaimerItem3Body));
+        itemsStack.Children.Add(CreateDisclaimerItem(s.DisclaimerItem4Title, s.DisclaimerItem4Body));
+        itemsStack.Children.Add(CreateDisclaimerItem(s.DisclaimerItem5Title, s.DisclaimerItem5Body));
+        itemsStack.Children.Add(CreateDisclaimerItem(s.DisclaimerItem6Title, s.DisclaimerItem6Body));
 
         var scrollViewer = new ScrollViewer
         {
@@ -425,7 +410,7 @@ public sealed partial class MainWindow : Window
         InitializeWithWindow.Initialize(savePicker, hwnd);
 
         savePicker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-        savePicker.FileTypeChoices.Add("JSON ファイル (*.json)", new[] { ".json" });
+        savePicker.FileTypeChoices.Add(LocalizationService.Strings.JsonFileFilterName, new[] { ".json" });
         savePicker.SuggestedFileName = "PhotoDateOrganizer_settings.json";
 
         var file = await savePicker.PickSaveFileAsync();
